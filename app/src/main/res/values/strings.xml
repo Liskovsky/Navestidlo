@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Návěstidlo</string>
+    <string name="menu_btnD"> ≡ </string>
+    <string name="menu_btnU"> ← </string>
+    <string name="screen_trenazer"> T r e n a ž e r </string>
+    <string name="screen_kviz"> K v í z </string>
+    <string name="screen_test"> T e s t </string>
+    <string name="close_btn"> KONEC </string>
+    <string name="kviz_btn"> KVÍZ </string>
+    <string name="trenazer_btn"> TRENAŽER </string>
+    <string name="test_btn"> TEST </string>
+    <string name="text_120"> 12 </string>
+    <string name="text_30"> 3 </string>
+    <string name="text_50"> 5 </string>
+    <string name="none"> text </string>
+
+</resources>

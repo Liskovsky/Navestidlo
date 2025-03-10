@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.Návěstidlo" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Přizpůsobení atributů vzhledu -->
+    </style>
+</resources>
