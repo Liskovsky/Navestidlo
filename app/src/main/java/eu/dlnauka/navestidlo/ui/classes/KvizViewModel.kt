@@ -1,41 +1,34 @@
 package eu.dlnauka.navestidlo.ui.classes
 
+import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
 import eu.dlnauka.navestidlo.ui.datastore.Event
 import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
-import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
 
-// Definice třídy KvizViewModel, která dědí funkcionality od třídy ViewModel
 class KvizViewModel(
-    private val repository: NavestiRepository) : ViewModel() {
+    private val repository: NavestiRepository
+) : ViewModel() {
 
-    // Deklarace a inicializace proměnných
     val isKvizHeadSignalBoxVisible = mutableStateOf(true)
     private val isAllShiftBoxVisible = mutableStateOf(false)
-    private val shiftColors = mutableStateOf(
-        listOf<AllBlinkingColors>(
-            AllBlinkingColors.SolidColor(Color.DarkGray),
-            AllBlinkingColors.SolidColor(Color.DarkGray)
+    private val shiftColors: MutableState<List<AllBlinkingColors>> =
+        mutableStateOf(
+            List(2) { AllBlinkingColors.SolidColor(Color.DarkGray) }
         )
-    )
-    val speedLinesColors = mutableStateOf(
-        listOf<AllBlinkingColors>(
-            AllBlinkingColors.SolidColor(Color.DarkGray),
-            AllBlinkingColors.SolidColor(Color.DarkGray)
+    val speedLinesColors: MutableState<List<AllBlinkingColors>> =
+        mutableStateOf(
+            List(2) { AllBlinkingColors.SolidColor(Color.DarkGray) }
         )
-    )
     val isKvizSpeedLinesVisible = mutableStateOf(true)
-    val signalColors = mutableStateOf(
-        listOf<AllBlinkingColors>(
-            AllBlinkingColors.SolidColor(Color.DarkGray),
-            AllBlinkingColors.SolidColor(Color.DarkGray),
-            AllBlinkingColors.SolidColor(Color.DarkGray),
-            AllBlinkingColors.SolidColor(Color.DarkGray),
-            AllBlinkingColors.SolidColor(Color.DarkGray)
+    val signalColors: MutableState<List<AllBlinkingColors>> =
+        mutableStateOf(
+            List(5) { AllBlinkingColors.SolidColor(Color.DarkGray) }
         )
-    )
     private val isShowLinesVisible = mutableStateOf(false)
     val isAllTab120Visible = mutableStateOf(false)
     val onAllTabNumberText = mutableStateOf("")
@@ -45,40 +38,43 @@ class KvizViewModel(
     val fineMessage = mutableStateOf<String?>(null)
     val errorMessage = mutableStateOf<String?>(null)
     val resultCheck = mutableStateOf<String?>(null)
-    val assignment = mutableStateOf("Načítám...")
+    val assignment = mutableStateOf<Map<String, String>>(emptyMap())
     val eventId = mutableStateOf("")
     val isAllDescriptionBoxVisible = mutableStateOf(false)
     val resetTrigger = mutableIntStateOf(0)
 
-    // Asynchronní funkce pro načtení náhodné události
-    suspend fun loadRandomEvent() {
+    suspend fun loadRandomEvent(context: Context) {
         resetNavestidlo()
+        val res = context.resources
         try {
             var randomEventDocument = repository.getRandomEventDocument()
             var attempts = 5
-
-            // Pokračuje v pokusech načíst náhodnou událost, dokud není nalezena nebo dokud nedojdou pokusy (ochrana proti zacyklení)
             while (randomEventDocument != null && attempts-- > 0) {
                 val randomEvent = repository.getEvent(randomEventDocument.id)
-
-                // Zkontroluje, jestli je nalezena platná událost a nastaví hodnoty, je zde vyloučeno nastavení hodnot pro některé události
                 if (randomEvent != null &&
-                    !randomEventDocument.id.equals("PosunDovolenPN", ignoreCase = true) &&
-                    !randomEventDocument.id.equals("PosunZakazanPN", ignoreCase = true) &&
-                    !randomEventDocument.id.equals("PosunDovolenHLN", ignoreCase = true)) {
-
+                    !randomEventDocument.id.equals("PosunDovolenPN", true) &&
+                    !randomEventDocument.id.equals("PosunZakazanPN", true) &&
+                    !randomEventDocument.id.equals("PosunDovolenHLN", true)
+                ) {
                     eventId.value = randomEventDocument.id
                     assignment.value = randomEvent.name
                     return
                 }
                 randomEventDocument = repository.getRandomEventDocument()
             }
-            assignment.value = "Událost nebyla nalezena"
+            assignment.value = mapOf(
+                "cs" to res.getString(R.string.event_not_found),
+                "de" to res.getString(R.string.event_not_found)
+            )
         } catch (e: Exception) {
-            assignment.value = "Chyba při načítání"
+            Log.e("KvizViewModel", "Chyba při načítání eventu", e)
+            assignment.value = mapOf(
+                "cs" to res.getString(R.string.event_load_error),
+                "de" to res.getString(R.string.event_load_error)
+            )
         }
     }
-    // Funkce resetující stav návěstidla
+
     fun resetNavestidlo() {
         val newState = KvizScreenState(
             isAllTab120Visible = false,
@@ -86,19 +82,9 @@ class KvizViewModel(
             isAllTabPictureVisible = false,
             isKvizHeadSignalBoxVisible = true,
             isKvizSpeedLinesVisible = true,
-            speedLinesColors = listOf(
-                AllBlinkingColors.SolidColor(Color.DarkGray),
-                AllBlinkingColors.SolidColor(Color.DarkGray)
-            ),
-            signalColors = listOf(
-                AllBlinkingColors.SolidColor(Color.DarkGray),
-                AllBlinkingColors.SolidColor(Color.DarkGray),
-                AllBlinkingColors.SolidColor(Color.DarkGray),
-                AllBlinkingColors.SolidColor(Color.DarkGray),
-                AllBlinkingColors.SolidColor(Color.DarkGray)
-            )
+            speedLinesColors = List(2) { AllBlinkingColors.SolidColor(Color.DarkGray) },
+            signalColors = List(5) { AllBlinkingColors.SolidColor(Color.DarkGray) }
         )
-        // Nastavení proměnných podle nového stavu
         isKvizHeadSignalBoxVisible.value = newState.isKvizHeadSignalBoxVisible
         isAllShiftBoxVisible.value = false
         speedLinesColors.value = newState.speedLinesColors
@@ -112,103 +98,61 @@ class KvizViewModel(
         isAllTabPictureVisible.value = newState.isAllTabPictureVisible
         resetTrigger.intValue += 1
     }
-    // Funkce zajišťující kontrolu nastavení uživatelova eventu a porovnání s očekávaným nastavením eventu dle databáze
-    fun checkSettings (expectedEvent: Event?) {
+
+    fun checkSettings(expectedEvent: Event?, context: Context) {
+        val res = context.resources
         if (expectedEvent == null) {
-            resultCheck.value = "Událost nebyla načtena."
+            resultCheck.value = res.getString(R.string.event_not_found)
             return
         }
+
         val userEvent = createUserEvent()
         val errors = mutableListOf<String>()
 
-        // Pomocná funkce pro kontrolu viditelnosti a porovnání hodnot, kde vylučuji zachycování chyb u prvků kde visible = false
+        fun msg(@androidx.annotation.StringRes id: Int) = res.getString(id)
+
         fun checkVisibilityAndCompare(
             isExpectedVisible: Boolean?,
             isUserVisible: Boolean,
             expectedValue: Any,
             userValue: Any,
-            errorMessage: String
+            messageId: Int
         ) {
             if (isExpectedVisible == true) {
                 if (expectedValue is List<*> && userValue is List<*>) {
-                    val expectedColors = expectedValue.map { it as? AllBlinkingColors }
-                    val userColors = userValue.map { it as? AllBlinkingColors }
-                    if (expectedColors != userColors) {
-                        errors.add(errorMessage)
-                    }
+                    val expected = expectedValue.map { it as? AllBlinkingColors }
+                    val actual = userValue.map { it as? AllBlinkingColors }
+                    if (expected != actual) errors.add(msg(messageId))
                 } else if (expectedValue != userValue) {
-                    errors.add(errorMessage)
+                    errors.add(msg(messageId))
                 }
             } else if (isExpectedVisible != isUserVisible) {
-                errors.add(errorMessage)
+                errors.add(msg(messageId))
             }
         }
-        // Volání pomocné funkce pro porovnání jednotlivých komponent návěstidla
-        checkVisibilityAndCompare(
-            expectedEvent.isAllHeadSignalVisible,
-            userEvent.isAllHeadSignalVisible,
-            expectedEvent.signalColors,
-            userEvent.signalColors,
-            "Barvy návěstidla jsou chybně."
-        )
-        checkVisibilityAndCompare(
-            expectedEvent.isAllSpeedLinesVisible,
-            userEvent.isAllSpeedLinesVisible,
-            expectedEvent.speedLinesColors,
-            userEvent.speedLinesColors,
-            "Rychlostní pruhy jsou chybně."
-        )
-        checkVisibilityAndCompare(
-            expectedEvent.isAllTabNumberVisible,
-            userEvent.isAllTabNumberVisible,
-            expectedEvent.allTabNumberText,
-            userEvent.allTabNumberText,
-            "Rychlost na indikátoru je chybně."
-        )
-        checkVisibilityAndCompare(
-            expectedEvent.isAllTabPictureVisible,
-            userEvent.isAllTabPictureVisible,
-            expectedEvent.allTabPictureText,
-            userEvent.allTabPictureText,
-            "Doplňková tabulka je chybně."
-        )
-        checkVisibilityAndCompare(
-            expectedEvent.isAllShiftBoxVisible,
-            userEvent.isAllShiftBoxVisible,
-            expectedEvent.shiftColors,
-            userEvent.shiftColors,
-            "Barvy boxu posunu se neshodují."
-        )
-        checkVisibilityAndCompare(
-            expectedEvent.isAllTab120Visible,
-            userEvent.isAllTab120Visible,
-            expectedEvent.isAllTab120Visible,
-            userEvent.isAllTab120Visible,
-            "Indikátor 120 km/h je chybně."
-        )
-        // Pokud nejsou nalezeny chyby v seznamu, nastaví se zpráva s úspěšným zakončení, jinak se nastaví zpráva se sezname chyb
+
+        checkVisibilityAndCompare(expectedEvent.isAllHeadSignalVisible, userEvent.isAllHeadSignalVisible, expectedEvent.signalColors, userEvent.signalColors, R.string.error_head_signal)
+        checkVisibilityAndCompare(expectedEvent.isAllSpeedLinesVisible, userEvent.isAllSpeedLinesVisible, expectedEvent.speedLinesColors, userEvent.speedLinesColors, R.string.error_speed_lines)
+        checkVisibilityAndCompare(expectedEvent.isAllTabNumberVisible, userEvent.isAllTabNumberVisible, expectedEvent.allTabNumberText, userEvent.allTabNumberText, R.string.error_number_indicator)
+        checkVisibilityAndCompare(expectedEvent.isAllTabPictureVisible, userEvent.isAllTabPictureVisible, expectedEvent.allTabPictureText, userEvent.allTabPictureText, R.string.error_picture_tab)
+        checkVisibilityAndCompare(expectedEvent.isAllShiftBoxVisible, userEvent.isAllShiftBoxVisible, expectedEvent.shiftColors, userEvent.shiftColors, R.string.error_shift_box)
+        checkVisibilityAndCompare(expectedEvent.isAllTab120Visible, userEvent.isAllTab120Visible, expectedEvent.isAllTab120Visible, userEvent.isAllTab120Visible, R.string.error_indicator_120)
+
         if (errors.isEmpty()) {
-            val successMessages = listOf(
-                "Jen tak dále :-D.",
-                "Výborně, z Tebe už je hotovej fíra!",
-                "Ty už jezdíš hodně dlouho, co?",
-                "Udělej i nějakou chybu! Přestává to být sranda.",
-                "Ty máš paměť jako slon. :-D"
-            )
-            val randomMessage = successMessages.random()
-            resultCheck.value = "✅ USPĚL ✅"
-            fineMessage.value = randomMessage
+            val messages = res.getStringArray(R.array.success_messages)
+            resultCheck.value = res.getString(R.string.result_success)
+            fineMessage.value = messages.random()
         } else {
-            val errorText = errors.joinToString("\n")
-            resultCheck.value = "❌ NEUSPĚL ❌"
-            errorMessage.value = errorText
+            resultCheck.value = res.getString(R.string.result_failure)
+            errorMessage.value = errors.joinToString("\n")
         }
+
         isAllDescriptionBoxVisible.value = true
     }
-    // Funkce zajišťující vytvoření uživatelského eventu - nastavení návěstidla uživatelem
+
     private fun createUserEvent(): Event {
-        val userEvent = Event(
-            description = "",
+        return Event(
+            description = mapOf("cs" to ""),
             name = assignment.value,
             isAllTab120Visible = isAllTab120Visible.value,
             isAllHeadSignalVisible = isKvizHeadSignalBoxVisible.value,
@@ -223,6 +167,5 @@ class KvizViewModel(
             isAllShiftBoxVisible = isAllShiftBoxVisible.value,
             shiftColors = shiftColors.value
         )
-        return userEvent
     }
 }

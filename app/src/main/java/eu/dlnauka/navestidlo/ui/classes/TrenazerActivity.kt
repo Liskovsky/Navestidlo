@@ -3,7 +3,6 @@ package eu.dlnauka.navestidlo.ui.classes
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.google.firebase.FirebaseApp
 import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
 import eu.dlnauka.navestidlo.ui.screens.MainScreen
 

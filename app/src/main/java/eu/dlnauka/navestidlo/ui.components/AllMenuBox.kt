@@ -1,5 +1,6 @@
 package eu.dlnauka.navestidlo.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -11,12 +12,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+data class MenuItem(
+    val route: String,
+    @StringRes val labelRes: Int
+)
 
 // Definice kompozice pro zobrazení menu boxu
 @Composable
 fun AllMenuBox(
     screenName: String,
-    menuOptions: List<String>,
+    menuItems: List<MenuItem>,
     onMenuOptionSelected: (String) -> Unit,
     onExitApp: () -> Unit,
     expanded: Boolean,
@@ -60,6 +68,7 @@ fun AllMenuBox(
                 textAlign = TextAlign.Start
             )
         }
+
         // Dropdown menu obsahující možnosti celého menu
         DropdownMenu(
             expanded = expanded,
@@ -67,15 +76,15 @@ fun AllMenuBox(
             modifier = Modifier
                 .background(Color.Black)
         ) {
-            menuOptions.forEach { option ->
+            menuItems.forEach { item ->
                 DropdownMenuItem(
                     onClick = {
                         onExpandedChange(false)
-                        onMenuOptionSelected(option)
+                        onMenuOptionSelected(item.route)
                     },
                     text = {
                         Text(
-                            text = option,
+                            text = localizedString(item.labelRes),
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             style = MaterialTheme.typography.bodyLarge,
@@ -99,7 +108,7 @@ fun AllMenuBox(
                 },
                 text = {
                     Text(
-                        text = "Konec",
+                        text = localizedString(R.string.close_btn),
                         fontWeight = FontWeight.Bold,
                         color = Color.Black,
                         style = MaterialTheme.typography.bodyLarge,
@@ -110,6 +119,11 @@ fun AllMenuBox(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
                     .background(Color.Red, shape = MaterialTheme.shapes.medium)
                     .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+            )
+            DropdownMenuItem(
+                text = { LanguageSelector() },
+                onClick = {},
+                enabled = false
             )
         }
     }

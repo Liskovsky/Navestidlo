@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,6 +20,11 @@ import eu.dlnauka.navestidlo.ui.classes.GoogleAdBox
 import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
 import eu.dlnauka.navestidlo.ui.datastore.Event
 import eu.dlnauka.navestidlo.ui.components.*
+import eu.dlnauka.navestidlo.ui.localization.LanguagePreferenceManager
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localized
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 
 @Composable
 fun Trenazer(
@@ -28,16 +32,29 @@ fun Trenazer(
     repository: NavestiRepository,
     onExitApp: () -> Unit
 ) {
+    val context = LocalLocalizedContext.current
+    val langCode by produceState(initialValue = "cs") {
+        value = LanguagePreferenceManager.resolveAppLanguage(context)
+    }
+
     val scrollState = rememberScrollState()
 
     // Výchozí událost pro trenazer (s návěstidlem nastaveno na "Stůj")
     val defaultEvent = Event(
-        description = "Návěst Stůj zakazuje strojvedoucímu jízdu vlaku. " +
+        description = mapOf(
+            "cs" to "Návěst Stůj zakazuje strojvedoucímu jízdu vlaku. " +
                 "Čelo jedoucího vlaku musí zastavit 10 m před hlavním návěstidlem. " +
                 "Tam, kde hlavní návěstidlo není přímo u koleje, musí čelo vlaku zastavit před návěstidlem s návěstí Konec vlakové cesty. " +
                 "Vzdáleností 10 m před hlavním návěstidlem je stanoveno obvyklé místo zastavení. " +
                 "Strojvedoucí může zastavit co nejblíže před hlavním návěstidlem v případě, že je to nutné vzhledem k délce vlaku nebo na pokyn výpravčího.",
-                name = "Stůj",
+            "de" to "Signal Halt verbietet dem Triebfahrzeugführer die Weiterfahrt. " +
+                    "Die Spitze des Zuges muss 10 m vor dem Hauptsignal anhalten. " +
+                    "Wo kein Hauptsignal direkt am Gleis steht, muss die Zugspitze vor dem Signal mit dem Hinweis „Ende der Zugstraße“ anhalten. " +
+                    "Der Abstand von 10 m stellt die übliche Halteposition dar. " +
+                    "Der Triebfahrzeugführer kann bei Bedarf oder auf Anweisung des Fahrdienstleiters näher heranfahren. "),
+        name = mapOf(
+            "cs" to "Stůj",
+            "de" to "Halt"),
         isAllTab120Visible = false,
         isAllHeadSignalVisible = true,
         isShowLinesVisible = true,
@@ -94,8 +111,10 @@ fun Trenazer(
         ) {
             // Horní menu s možnostmi pro přechod mezi obrazovkami
             AllMenuBox(
-                screenName = "T r e n a ž e r",
-                menuOptions = listOf(Destinations.KVIZ, Destinations.TEST),
+                screenName = localizedString(R.string.screen_trenazer),
+                menuItems = listOf(
+                    MenuItem(Destinations.KVIZ, R.string.kviz_btn),
+                    MenuItem(Destinations.TEST, R.string.test_btn)),
                 onMenuOptionSelected = { selectedScreen -> navController.navigate(selectedScreen) },
                 onExitApp = onExitApp,
                 expanded = expanded,
@@ -146,7 +165,7 @@ fun Trenazer(
                     .fillMaxWidth()
                     .wrapContentWidth(Alignment.CenterHorizontally)
             ) {
-                GoogleAdBox.AdBanner(context = LocalContext.current)
+                GoogleAdBox.AdBanner(context = context)
             }
             Spacer(modifier = Modifier.height(20.dp))
         }
@@ -159,6 +178,7 @@ fun Trenazer(
                         description = null,
                         onClose = { showDescription = false },
                         showCloseButton = true,
+                        closeButtonText = localizedString(R.string.button_close),
                         descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
                         descriptionAlignment = TextAlign.Center,
                         content = {
@@ -168,7 +188,7 @@ fun Trenazer(
                                     .fillMaxWidth()
                             ) {
                                 Text(
-                                    text = selectedEvent.description,
+                                    text = selectedEvent.description.localized(langCode),
                                     style = MaterialTheme.typography.bodyLarge.copy(color = Color.White)
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -192,7 +212,7 @@ fun Trenazer(
                     .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
             ) {
                 Text(
-                    text = "Popis",
+                    text = localizedString(R.string.button_desc),
                     fontWeight = FontWeight.Bold,
                     fontSize = MaterialTheme.typography.bodyLarge.fontSize
                 )

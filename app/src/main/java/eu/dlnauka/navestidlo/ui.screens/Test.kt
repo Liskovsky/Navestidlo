@@ -6,20 +6,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import eu.dlnauka.navestidlo.R
 import eu.dlnauka.navestidlo.ui.classes.GoogleAdBox
 import eu.dlnauka.navestidlo.ui.components.*
 import eu.dlnauka.navestidlo.ui.classes.TestViewModel
 import eu.dlnauka.navestidlo.ui.classes.TestViewModelFactory
 import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 
 @Composable
 fun Test(
@@ -27,16 +30,14 @@ fun Test(
     repository: NavestiRepository,
     onExitApp: () -> Unit
 ) {
-    // Inicializace ViewModelu pro obrazovku Test
     val viewModel: TestViewModel = viewModel(factory = TestViewModelFactory(repository))
+    val context = LocalLocalizedContext.current
 
-    // Řízení zobrazení rozbalovacího menu
     var expanded by remember { mutableStateOf(false) }
 
-    // Stav pro zobrazení popisu
-    var showDescription by remember { mutableStateOf(false) }
+    // Stav pro zobrazování modálního okna (automaticky true při startu)
+    var showDescription by rememberSaveable { mutableStateOf(true) }
 
-    // Hlavní Box pro celé zobrazení obrazovky test
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
         Column(
@@ -44,55 +45,64 @@ fun Test(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // Horní menu s možnostmi pro přechod mezi obrazovkami
+            // Horní menu
             AllMenuBox(
-                screenName = "T e s t",
-                menuOptions = listOf(Destinations.KVIZ, Destinations.TRENAZER),
-                onMenuOptionSelected = { selectedScreen -> navController.navigate(selectedScreen) },
+                screenName = localizedString(R.string.screen_test),
+                menuItems = listOf(
+                    MenuItem(Destinations.TRENAZER, R.string.trenazer_btn),
+                    MenuItem(Destinations.KVIZ, R.string.kviz_btn)
+                ),
+                onMenuOptionSelected = { navController.navigate(it) },
                 onExitApp = onExitApp,
                 expanded = expanded,
                 onExpandedChange = { expanded = it }
             )
-            // Podmíněné zobrazení podle aktuálního stavu testu
+
+            // Podmíněné UI řízení:
             when {
-                // Zobrazení modálního okna pro výběr počtu otázek
-                viewModel.state.showQuestionSelect -> {
+                // Je aktivní výběr počtu otázek
+                showDescription || viewModel.state.showQuestionSelect -> {
                     ModalDialog(
                         onDismiss = { showDescription = false },
                         content = {
                             AllDescriptionBox(
-                                description = "Vyberte počet otázek pro test:",
+                                description = localizedString(R.string.select_quest_count),
                                 onClose = { showDescription = false },
                                 showCloseButton = false,
+                                closeButtonText = localizedString(R.string.button_close),
                                 descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
                                 descriptionAlignment = TextAlign.Center,
                                 content = {
-                                    TestCountSelect(onSelectionChanged = { count ->
-                                        showDescription = false
-                                        viewModel.setQuestionCount(count)
-                                    })
+                                    TestCountSelect(
+                                        onSelectionChanged = { count ->
+                                            showDescription = false
+                                            viewModel.setQuestionCount(count)
+                                        }
+                                    )
                                 }
                             )
                         }
                     )
                 }
-                // Zobrazení výsledků testu
+
+                // Test je dokončen → zobraz výsledky
                 viewModel.state.showResults -> {
                     TestResultsView(
                         state = viewModel.state,
                         onRestart = {
                             viewModel.restartTest()
                             expanded = false
+                            showDescription = true // Znovu vyvolat výběr otázek
                         },
                         onMenuExpand = { expanded = true }
                     )
                 }
+
+                // Probíhá samotný test → UI + otázky
                 else -> {
-                    // Zobrazení průběhu testu
                     Column {
-                        // Blok pro zobrazení zadání
                         AllTextBlock(
-                            assignment = "Co svítí na návěstidle?",
+                            assignment = localizedString(R.string.quiz_promt),
                             textColor = Color.White,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
@@ -102,32 +112,34 @@ fun Test(
                             fontSize = 18,
                             backgroundColor = Color.Transparent
                         )
-                        // Zobrazení aktuálního zadání
-                        TestQuestionView(
-                            state = viewModel.state,
 
-                            // Zpracování vybrané odpovědi
-                            onAnswerSelected = viewModel::selectAnswer,
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                        )
-                        // Zobrazení indikátorů průběhu testu
-                        TestProgressIndicators(
-                            questionCount = viewModel.state.questionCount,
-                            maxQuestionCount = viewModel.state.maxQuestionCount,
-                            correctAnswers = viewModel.state.correctAnswers
-                        )
+                        // ✅ Bezpečné vykreslení otázky
+                        if (viewModel.state.currentQuestion != null) {
+                            TestQuestionView(
+                                state = viewModel.state,
+                                onAnswerSelected = viewModel::selectAnswer,
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth()
+                            )
+
+                            TestProgressIndicators(
+                                questionCount = viewModel.state.questionCount,
+                                maxQuestionCount = viewModel.state.maxQuestionCount,
+                                correctAnswers = viewModel.state.correctAnswers
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(100.dp))
 
-                        // Reklamní banner
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .wrapContentWidth(Alignment.CenterHorizontally)
                         ) {
-                            GoogleAdBox.AdBanner(context = LocalContext.current)
+                            GoogleAdBox.AdBanner(context = context)
                         }
+
                         Spacer(modifier = Modifier.height(20.dp))
                     }
                 }

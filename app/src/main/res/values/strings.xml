@@ -1,17 +1,60 @@
 <resources>
     <string name="app_name">Návěstidlo</string>
-    <string name="menu_btnD"> ≡ </string>
-    <string name="menu_btnU"> ← </string>
     <string name="screen_trenazer"> T r e n a ž e r </string>
     <string name="screen_kviz"> K v í z </string>
     <string name="screen_test"> T e s t </string>
     <string name="close_btn"> KONEC </string>
-    <string name="kviz_btn"> KVÍZ </string>
-    <string name="trenazer_btn"> TRENAŽER </string>
-    <string name="test_btn"> TEST </string>
-    <string name="text_120"> 12 </string>
-    <string name="text_30"> 3 </string>
-    <string name="text_50"> 5 </string>
-    <string name="none"> text </string>
+    <string name="kviz_btn"> Kvíz </string>
+    <string name="trenazer_btn"> Trenažer </string>
+    <string name="test_btn"> Test </string>
+    <string name="indikator_120"> Indikátor 120 </string>
+    <string name="indikatory"> Indikátory </string>
+    <string name="tabulky"> Tabulky </string>
+    <string name="button_desc"> Popis </string>
+    <string name="button_reset"> Reset </string>
+    <string name="button_check"> Kontrola </string>
+    <string name="button_next"> Další </string>
+    <string name="button_close"> Zavřít </string>
+    <string name="select_quest_count"> Vyberte počet otázek </string>
+    <string name="quiz_promt"> Co svítí na návěstidle? </string>
+    <string name="button_confirm"> Potvrdit </string>
+    <string name="button_retry"> Znovu </string>
+    <string name="button_menu"> Menu </string>
+    <string name="test_count_label"> Počet otázek: %1$d z %2$d </string>
+    <string name="test_success_rate"> Procentuální úspěšnost: %1$d%% </string>
+    <string name="dropdown_label"> Vyberte položku </string>
+    <string name="quiz_title"> Nastav na návěstidle: </string>
+    <string name="test_result">Hodnocení testu: %1$d%%</string>
+
+    <string name="event_not_found"> Událost nebyla nalezena </string>
+    <string name="event_load_error"> Chyba při načítání </string>
+    <string name="result_success">✅ USPĚL ✅</string>
+    <string name="result_failure">❌ NEUSPĚL ❌</string>
+
+    <!-- Chybové hlášky -->
+    <string name="error_head_signal"> Barvy návěstidla jsou chybně. </string>
+    <string name="error_speed_lines"> Rychlostní pruhy jsou chybně. </string>
+    <string name="error_number_indicator"> Rychlost na indikátoru je chybně. </string>
+    <string name="error_picture_tab"> Doplňková tabulka je chybně. </string>
+    <string name="error_shift_box"> Barvy návěstidla pro posun se neshodují. </string>
+    <string name="error_indicator_120"> Indikátor 120 km/h je chybně. </string>
+
+    <!-- Motivační hlášky -->
+    <string-array name="success_messages">
+        <item> Jen tak dále :-D. </item>
+        <item> Výborně, z Tebe už je hotovej fíra! </item>
+        <item> Ty už jezdíš hodně dlouho, co? </item>
+        <item> Udělej i nějakou chybu! Přestává to být sranda. </item>
+        <item> Ty máš paměť jako slon. :-D </item>
+    </string-array>
+
+    <!-- Motivační hlášky -->
+    <string-array name="failed_messages">
+        <item> Nevadí, příště to zvládneš! </item>
+        <item> Hlavu vzhůru, zkus to znovu! </item>
+        <item> Cvičení dělá mistra! </item>
+        <item> Nepřestávej se učit a zlepšíš se. </item>
+        <item> Každý neúspěch je krokem k úspěchu! </item>
+    </string-array>
 
 </resources>

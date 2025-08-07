@@ -19,10 +19,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import eu.dlnauka.navestidlo.R
 import eu.dlnauka.navestidlo.ui.classes.KvizScreenState
 import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
 import eu.dlnauka.navestidlo.ui.classes.KvizViewModel
 import eu.dlnauka.navestidlo.ui.classes.KvizViewModelFactory
+import eu.dlnauka.navestidlo.ui.localization.LanguagePreferenceManager
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localized
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 import kotlinx.coroutines.launch
 
 @Composable
@@ -31,16 +36,19 @@ fun Kviz(
     repository: NavestiRepository,
     onExitApp: () -> Unit
 ) {
-    // Vytváření ViewModel pro správu stavu kvízu
+    val context = LocalLocalizedContext.current
+    val langCode by produceState(initialValue = "cs") {
+        value = LanguagePreferenceManager.resolveAppLanguage(context)
+    }
+
     val viewModel: KvizViewModel = viewModel(factory = KvizViewModelFactory(repository))
     val coroutineScope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
 
-    // Na začátku se načte náhodná událost pro kvíz
     LaunchedEffect(Unit) {
-        viewModel.loadRandomEvent()
+        viewModel.loadRandomEvent(context)
     }
-    // Uložení aktuálního stavu obrazovky pro pozdější použití
+
     val visibilityStates = remember {
         mutableStateOf(
             KvizScreenState(
@@ -54,7 +62,7 @@ fun Kviz(
             )
         )
     }
-    // Při každé změně resetTriggeru se obnoví viditelnost komponent
+
     LaunchedEffect(viewModel.resetTrigger.intValue) {
         visibilityStates.value = KvizScreenState(
             isAllTab120Visible = viewModel.isAllTab120Visible.value,
@@ -66,25 +74,27 @@ fun Kviz(
             signalColors = viewModel.signalColors.value
         )
     }
-    Box(modifier = Modifier.fillMaxSize()) {
 
+    Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // Horní menu s názvem kvízu a možnostmi pro přechod na jiné obrazovky
             Box(modifier = Modifier.fillMaxWidth()) {
                 AllMenuBox(
-                    screenName = "K v í z",
-                    menuOptions = listOf(Destinations.TRENAZER, Destinations.TEST),
+                    screenName = localizedString(R.string.screen_kviz),
+                    menuItems = listOf(
+                        MenuItem(Destinations.TRENAZER, R.string.trenazer_btn),
+                        MenuItem(Destinations.TEST, R.string.test_btn)),
                     onMenuOptionSelected = { selectedScreen -> navController.navigate(selectedScreen) },
                     onExitApp = onExitApp,
                     expanded = expanded,
                     onExpandedChange = { expanded = it }
                 )
-                // Tlačítko pro resetování nastavení návěstidla
+
                 Button(
                     onClick = { viewModel.resetNavestidlo() },
                     colors = ButtonDefaults.buttonColors(
@@ -98,43 +108,38 @@ fun Kviz(
                         .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
                 ) {
                     Text(
-                        text = "Reset",
+                        text = localizedString(R.string.button_reset),
                         fontWeight = FontWeight.Bold,
                         fontSize = MaterialTheme.typography.bodyLarge.fontSize
                     )
                 }
             }
-            // Hlavní řádek kvízu, který zobrazuje text náhodné událost a kontroluje nastavení
+
             KvizHeaderRow(
                 loadRandomEvent = {
                     coroutineScope.launch {
-
-                        // Načtení nové události
-                        viewModel.loadRandomEvent()
+                        viewModel.loadRandomEvent(context)
                     }
                 },
                 checkSettings = {
                     coroutineScope.launch {
-
-                        // Načtení očekávané události
                         val expectedEvent = repository.getEvent(viewModel.eventId.value)
-
-                        // Kontrola nastavení kvízu
-                        viewModel.checkSettings(expectedEvent)
+                        viewModel.checkSettings(expectedEvent, context)
                     }
                 }
             )
-            // Zobrazení zadání pro uživatele
+
+            // Tady lokalizujeme assignment (který by měl být String)
             AllTextBlock(
-                assignment = viewModel.assignment.value,
+                assignment = viewModel.assignment.value.localized(langCode),
                 textColor = Color.Black,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .wrapContentWidth()
                     .padding(horizontal = 8.dp, vertical = 6.dp),
-                fontSize = 15)
+                fontSize = 15
+            )
 
-            // Dynamické komponenty kvízu, které se mění podle aktuálních stavů - tedy nastavování dle uživatele
             KvizDynamicComponents(
                 kvizScreenStates = visibilityStates.value,
                 isKvizScreen = true,
@@ -150,14 +155,13 @@ fun Kviz(
             )
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Ovládací tlačítka pro kvíz
             KvizControlButtons(
                 viewModel = viewModel,
                 kvizScreenStates = visibilityStates
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
-        // Modal dialog pro zobrazení výsledků kvízu
+
         if (viewModel.isAllDescriptionBoxVisible.value) {
             ModalDialog(
                 onDismiss = { viewModel.isAllDescriptionBoxVisible.value = false },
@@ -166,6 +170,7 @@ fun Kviz(
                         description = null,
                         onClose = { viewModel.isAllDescriptionBoxVisible.value = false },
                         showCloseButton = true,
+                        closeButtonText = localizedString(R.string.button_close),
                         descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
                         descriptionAlignment = TextAlign.Center,
                         content = {
@@ -187,8 +192,7 @@ fun Kviz(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                // Zobrazení zprávy v závislosti na výsledku kvízu
-                                if (viewModel.resultCheck.value == "✅ USPĚL ✅") {
+                                if (viewModel.resultCheck.value == localizedString(R.string.result_success)) {
                                     Text(
                                         text = viewModel.fineMessage.value ?: "",
                                         style = MaterialTheme.typography.bodyLarge.copy(color = Color.White),

@@ -13,10 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.Dialog
+import eu.dlnauka.navestidlo.R
 
 // Definice kompozice pro zobrazení popisného okna
 @Composable
@@ -24,6 +26,7 @@ fun AllDescriptionBox(
     description: String?,
     onClose: () -> Unit,
     showCloseButton: Boolean,
+    closeButtonText: String,
     descriptionTextStyle: TextStyle,
     descriptionAlignment: TextAlign,
     content: @Composable () -> Unit
@@ -73,7 +76,7 @@ fun AllDescriptionBox(
                 Spacer(modifier = Modifier.height(8.dp))
                 if (showCloseButton) {
                     AllDescriptionButton(
-                        text = "Zavřít",
+                        text = closeButtonText,
                         onClick = onClose
                     )
                     Spacer(modifier = Modifier.height(16.dp))

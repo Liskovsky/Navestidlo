@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.text.font.FontWeight
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 
 // Deklarace composable funkce pro vytvoření hlavičky kvízu
 @Composable
@@ -31,7 +33,7 @@ fun KvizHeaderRow(
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(
-            text = "Nastav na návěstidle:",
+            text = localizedString(R.string.quiz_title),
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleMedium,
             color = Color.White,
@@ -43,19 +45,21 @@ fun KvizHeaderRow(
 
             // Tlačítko pro načtení náhodné události
             AllCustomButton(
-                text = "Další",
+                text = localizedString(R.string.button_next),
                 onClick = loadRandomEvent,
                 containerColor = Color.Black,
                 contentColor = Color.White,
-                modifier = Modifier.width(90.dp)
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 100.dp)
             )
             // Tlačítko pro kontrolu nastavení
             AllCustomButton(
-                text = "Kontrola",
+                text = localizedString(R.string.button_check),
                 onClick = checkSettings,
                 containerColor = Color.Black,
                 contentColor = Color(0xFFFFA500),
-                modifier = Modifier.width(120.dp)
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 100.dp)
             )
         }
     }

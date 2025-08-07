@@ -1,0 +1,3699 @@
+MANIFEST
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="eu.dlnauka.navestidlo">
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <application
+        android:name=".MyApp"
+        android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_navestidlo"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_navestidlo_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.N·vÏstidlo"
+        tools:targetApi="tiramisu">
+
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            android:resource="@xml/gma_ad_services_config"
+            tools:replace="android:resource" />
+
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9922878117886700~1554450395"/>
+
+        <activity
+            android:name=".ui.classes.TrenazerActivity"
+            android:exported="true"
+            android:theme="@style/Theme.N·vÏstidlo">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+
+
+CLASSES
+
+// Definuje balÌËek pro tuto t¯Ìdu
+package eu.dlnauka.navestidlo.ui.classes
+
+// Import pot¯ebn˝ch t¯Ìd a knihoven
+import android.util.Log
+import androidx.compose.ui.graphics.Color
+import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
+import androidx.core.graphics.toColorInt
+
+object ColorParser {
+
+    // Definice konstant pro dobu trv·nÌ blik·nÌ (v milisekund·ch)
+    private const val BLINK_DURATION_SLOW = 1111
+    private const val BLINK_DURATION_FAST = 600
+
+    // Vytvo¯Ìm mapu, kde klÌËem je ¯etÏzec a hodnotou je instance z AllBlinkingColors.Blinking nebo AllBlinkingColors.SolidColor
+    private val colorMap = mapOf(
+        "blikWhite" to AllBlinkingColors.Blinking(Color.White, Color.DarkGray, BLINK_DURATION_SLOW),
+        "blikBlue" to AllBlinkingColors.Blinking(Color.Blue, Color.DarkGray, BLINK_DURATION_SLOW),
+        "fastOrange" to AllBlinkingColors.Blinking(
+            Color(0xFFFFA500),
+            Color.DarkGray,
+            BLINK_DURATION_FAST
+        ),
+        "slowOrange" to AllBlinkingColors.Blinking(
+            Color(0xFFFFA500),
+            Color.DarkGray,
+            BLINK_DURATION_SLOW
+        ),
+        "slowGreen" to AllBlinkingColors.Blinking(Color.Green, Color.DarkGray, BLINK_DURATION_SLOW),
+        "fastGreen" to AllBlinkingColors.Blinking(Color.Green, Color.DarkGray, BLINK_DURATION_FAST),
+        "red" to AllBlinkingColors.SolidColor(Color.Red),
+        "blue" to AllBlinkingColors.SolidColor(Color.Blue),
+        "orange" to AllBlinkingColors.SolidColor(Color(0xFFFFA500)),
+        "white" to AllBlinkingColors.SolidColor(Color.White),
+        "green" to AllBlinkingColors.SolidColor(Color.Green),
+        "gray" to AllBlinkingColors.SolidColor(Color.DarkGray)
+    )
+
+    // Funkce parseBlinkColor p¯ev·dÌ ¯etÏzec na odpovÌdajÌcÌ AllBlinkingColors objekt
+    fun parseBlinkColor(colorString: String): AllBlinkingColors {
+
+        // Pokus o nalezenÌ barvy v mapÏ
+        return colorMap[colorString] ?:
+
+        // Pokud nenÌ nalezena, zpracuje ¯etÏzec podle jeho form·tu
+        try {
+            if (colorString.contains(",")) {
+
+                // RozdÏlenÌ ¯etÏzce na Ë·sti podle Ë·rky a vytvo¯Ì blikajÌcÌ barvu
+                val parts = colorString.split(",").takeIf { it.size >= 2 }
+                    ?: return AllBlinkingColors.SolidColor(Color.Gray)
+
+                AllBlinkingColors.Blinking(
+                    color1 = Color(parts[0].trim().toColorInt()),
+                    color2 = Color(parts[1].trim().toColorInt()),
+                    speed = parts.getOrNull(2)?.toIntOrNull() ?: 500
+                )
+            } else {
+
+                // Pokud ¯etÏzec neobsahuje û·dnou Ë·rku, povaûuje se za jednoduchou barvu
+                AllBlinkingColors.SolidColor(Color(colorString.toColorInt()))
+            }
+        } catch (e: Exception) {
+            Log.e("ColorParser", "Chyba p¯i parsov·nÌ barvy: $colorString", e)
+            return AllBlinkingColors.SolidColor(Color.Gray)
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.viewinterop.AndroidView
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.MobileAds
+
+object GoogleAdBox {
+
+    // Definuje funkci AdBanner jako Composable, kter· zobrazuje reklamnÌ banner
+    @Composable
+    fun AdBanner(context: Context) {
+
+        // Inicializuje MobileAds sadu SDK
+        MobileAds.initialize(context)
+
+        // PouûÌv· importovan˝ AndroidView k zobrazenÌ AdView komponenty
+        AndroidView(
+            factory = { ctx ->
+                AdView(ctx).apply {
+
+                    // NastavenÌ velikost reklamy na p¯eddefinovan˝ banner
+                    setAdSize(AdSize.BANNER)
+
+                    // NastavenÌ ID reklamnÌ jednotky
+                    adUnitId = "ca-app-pub-9922878117886700/8183185303"
+
+                    // NaËte reklamu s pouûitÌm AdRequest
+                    loadAd(AdRequest.Builder().build())
+                }
+            },
+            update = { adView ->
+
+                // NaËte novou reklamu p¯i aktualizaci zobrazenÌ
+                adView.loadAd(AdRequest.Builder().build())
+            }
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
+
+// Definice datovÈ t¯Ìdy KvizScreenState pro zajiötÏnÌ stavu obrazovky
+data class KvizScreenState(
+    var isAllTab120Visible: Boolean = false,
+    var isAllTabNumberVisible: Boolean = false,
+    var isAllTabPictureVisible: Boolean = false,
+    var isKvizHeadSignalBoxVisible: Boolean = true,
+    var isKvizSpeedLinesVisible: Boolean = true,
+    val signalColors: List<AllBlinkingColors> = emptyList(),
+    val speedLinesColors: List<AllBlinkingColors> = emptyList(),
+    var currentAllTabNumberIndex: Int = -1,
+    var currentAllTabPictureIndex: Int = -1
+) {
+    // Vytvo¯enÌ seznam˘ pro proch·zenÌ komponent
+    val numbers = listOf("3", "5", "12")
+    val pictures = listOf("oddil", "skupina", "vjezd", "stanoviste", "predvest")
+
+    // Funkce pro zobrazenÌ dalöÌho ËÌsla tabulky
+    fun showNextAllTabNumber(): KvizScreenState {
+        val newIndex = if (currentAllTabNumberIndex == numbers.size - 1) -1 else currentAllTabNumberIndex + 1
+        return copy(
+            isAllTabPictureVisible = false,
+            currentAllTabNumberIndex = newIndex,
+            isAllTabNumberVisible = newIndex != -1,
+            isKvizSpeedLinesVisible = newIndex == -1
+        )
+    }
+    // Funkce pro zobrazenÌ dalöÌho obr·zku tabulky
+    fun showNextAllTabPicture(): KvizScreenState {
+        val newIndex = if (currentAllTabPictureIndex == pictures.size - 1) -1 else currentAllTabPictureIndex + 1
+        return copy(
+            isAllTabNumberVisible = false,
+            currentAllTabPictureIndex = newIndex,
+            isAllTabPictureVisible = newIndex != -1,
+            isKvizSpeedLinesVisible = newIndex == -1
+        )
+    }
+    // Funkce pro resetov·nÌ ËÌsel tabulek
+    fun resetAllTabNumber(): KvizScreenState {
+        return copy(
+            currentAllTabNumberIndex = -1,
+            isAllTabNumberVisible = false,
+            isKvizSpeedLinesVisible = true
+        )
+    }
+    // Funkce pro resetov·nÌ obr·zk˘ tabulek
+    fun resetAllTabPicture(): KvizScreenState {
+        return copy(
+            currentAllTabPictureIndex = -1,
+            isAllTabPictureVisible = false,
+            isKvizSpeedLinesVisible = true
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import android.content.Context
+import android.util.Log
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.ViewModel
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
+import eu.dlnauka.navestidlo.ui.datastore.Event
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+
+class KvizViewModel(
+    private val repository: NavestiRepository
+) : ViewModel() {
+
+    val isKvizHeadSignalBoxVisible = mutableStateOf(true)
+    private val isAllShiftBoxVisible = mutableStateOf(false)
+    private val shiftColors: MutableState<List<AllBlinkingColors>> =
+        mutableStateOf(
+            List(2) { AllBlinkingColors.SolidColor(Color.DarkGray) }
+        )
+    val speedLinesColors: MutableState<List<AllBlinkingColors>> =
+        mutableStateOf(
+            List(2) { AllBlinkingColors.SolidColor(Color.DarkGray) }
+        )
+    val isKvizSpeedLinesVisible = mutableStateOf(true)
+    val signalColors: MutableState<List<AllBlinkingColors>> =
+        mutableStateOf(
+            List(5) { AllBlinkingColors.SolidColor(Color.DarkGray) }
+        )
+    private val isShowLinesVisible = mutableStateOf(false)
+    val isAllTab120Visible = mutableStateOf(false)
+    val onAllTabNumberText = mutableStateOf("")
+    val isAllTabNumberVisible = mutableStateOf(false)
+    val onAllTabPictureText = mutableStateOf("")
+    val isAllTabPictureVisible = mutableStateOf(false)
+    val fineMessage = mutableStateOf<String?>(null)
+    val errorMessage = mutableStateOf<String?>(null)
+    val resultCheck = mutableStateOf<String?>(null)
+    val assignment = mutableStateOf<Map<String, String>>(emptyMap())
+    val eventId = mutableStateOf("")
+    val isAllDescriptionBoxVisible = mutableStateOf(false)
+    val resetTrigger = mutableIntStateOf(0)
+
+    suspend fun loadRandomEvent(context: Context) {
+        resetNavestidlo()
+        val res = context.resources
+        try {
+            var randomEventDocument = repository.getRandomEventDocument()
+            var attempts = 5
+            while (randomEventDocument != null && attempts-- > 0) {
+                val randomEvent = repository.getEvent(randomEventDocument.id)
+                if (randomEvent != null &&
+                    !randomEventDocument.id.equals("PosunDovolenPN", true) &&
+                    !randomEventDocument.id.equals("PosunZakazanPN", true) &&
+                    !randomEventDocument.id.equals("PosunDovolenHLN", true)
+                ) {
+                    eventId.value = randomEventDocument.id
+                    assignment.value = randomEvent.name
+                    return
+                }
+                randomEventDocument = repository.getRandomEventDocument()
+            }
+            assignment.value = mapOf(
+                "cs" to res.getString(R.string.event_not_found),
+                "de" to res.getString(R.string.event_not_found)
+            )
+        } catch (e: Exception) {
+            Log.e("KvizViewModel", "Chyba p¯i naËÌt·nÌ eventu", e)
+            assignment.value = mapOf(
+                "cs" to res.getString(R.string.event_load_error),
+                "de" to res.getString(R.string.event_load_error)
+            )
+        }
+    }
+
+    fun resetNavestidlo() {
+        val newState = KvizScreenState(
+            isAllTab120Visible = false,
+            isAllTabNumberVisible = false,
+            isAllTabPictureVisible = false,
+            isKvizHeadSignalBoxVisible = true,
+            isKvizSpeedLinesVisible = true,
+            speedLinesColors = List(2) { AllBlinkingColors.SolidColor(Color.DarkGray) },
+            signalColors = List(5) { AllBlinkingColors.SolidColor(Color.DarkGray) }
+        )
+        isKvizHeadSignalBoxVisible.value = newState.isKvizHeadSignalBoxVisible
+        isAllShiftBoxVisible.value = false
+        speedLinesColors.value = newState.speedLinesColors
+        signalColors.value = newState.signalColors
+        isShowLinesVisible.value = false
+        isKvizSpeedLinesVisible.value = newState.isKvizSpeedLinesVisible
+        isAllTab120Visible.value = newState.isAllTab120Visible
+        onAllTabNumberText.value = ""
+        isAllTabNumberVisible.value = newState.isAllTabNumberVisible
+        onAllTabPictureText.value = ""
+        isAllTabPictureVisible.value = newState.isAllTabPictureVisible
+        resetTrigger.intValue += 1
+    }
+
+    fun checkSettings(expectedEvent: Event?, context: Context) {
+        val res = context.resources
+        if (expectedEvent == null) {
+            resultCheck.value = res.getString(R.string.event_not_found)
+            return
+        }
+
+        val userEvent = createUserEvent()
+        val errors = mutableListOf<String>()
+
+        fun msg(@androidx.annotation.StringRes id: Int) = res.getString(id)
+
+        fun checkVisibilityAndCompare(
+            isExpectedVisible: Boolean?,
+            isUserVisible: Boolean,
+            expectedValue: Any,
+            userValue: Any,
+            messageId: Int
+        ) {
+            if (isExpectedVisible == true) {
+                if (expectedValue is List<*> && userValue is List<*>) {
+                    val expected = expectedValue.map { it as? AllBlinkingColors }
+                    val actual = userValue.map { it as? AllBlinkingColors }
+                    if (expected != actual) errors.add(msg(messageId))
+                } else if (expectedValue != userValue) {
+                    errors.add(msg(messageId))
+                }
+            } else if (isExpectedVisible != isUserVisible) {
+                errors.add(msg(messageId))
+            }
+        }
+
+        checkVisibilityAndCompare(expectedEvent.isAllHeadSignalVisible, userEvent.isAllHeadSignalVisible, expectedEvent.signalColors, userEvent.signalColors, R.string.error_head_signal)
+        checkVisibilityAndCompare(expectedEvent.isAllSpeedLinesVisible, userEvent.isAllSpeedLinesVisible, expectedEvent.speedLinesColors, userEvent.speedLinesColors, R.string.error_speed_lines)
+        checkVisibilityAndCompare(expectedEvent.isAllTabNumberVisible, userEvent.isAllTabNumberVisible, expectedEvent.allTabNumberText, userEvent.allTabNumberText, R.string.error_number_indicator)
+        checkVisibilityAndCompare(expectedEvent.isAllTabPictureVisible, userEvent.isAllTabPictureVisible, expectedEvent.allTabPictureText, userEvent.allTabPictureText, R.string.error_picture_tab)
+        checkVisibilityAndCompare(expectedEvent.isAllShiftBoxVisible, userEvent.isAllShiftBoxVisible, expectedEvent.shiftColors, userEvent.shiftColors, R.string.error_shift_box)
+        checkVisibilityAndCompare(expectedEvent.isAllTab120Visible, userEvent.isAllTab120Visible, expectedEvent.isAllTab120Visible, userEvent.isAllTab120Visible, R.string.error_indicator_120)
+
+        if (errors.isEmpty()) {
+            val messages = res.getStringArray(R.array.success_messages)
+            resultCheck.value = res.getString(R.string.result_success)
+            fineMessage.value = messages.random()
+        } else {
+            resultCheck.value = res.getString(R.string.result_failure)
+            errorMessage.value = errors.joinToString("\n")
+        }
+
+        isAllDescriptionBoxVisible.value = true
+    }
+
+    private fun createUserEvent(): Event {
+        return Event(
+            description = mapOf("cs" to ""),
+            name = assignment.value,
+            isAllTab120Visible = isAllTab120Visible.value,
+            isAllHeadSignalVisible = isKvizHeadSignalBoxVisible.value,
+            isShowLinesVisible = isShowLinesVisible.value,
+            signalColors = signalColors.value,
+            isAllSpeedLinesVisible = isKvizSpeedLinesVisible.value,
+            speedLinesColors = speedLinesColors.value,
+            isAllTabNumberVisible = isAllTabNumberVisible.value,
+            allTabNumberText = onAllTabNumberText.value,
+            isAllTabPictureVisible = isAllTabPictureVisible.value,
+            allTabPictureText = onAllTabPictureText.value,
+            isAllShiftBoxVisible = isAllShiftBoxVisible.value,
+            shiftColors = shiftColors.value
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+
+// Definuje t¯Ìdu pro vytv·¯enÌ instancÌ ViewModelu
+class KvizViewModelFactory(private val repository: NavestiRepository) : ViewModelProvider.Factory {
+
+    // P¯episuje metodu create, kter· vytvo¯Ì ViewModel
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+
+        // Zkontroluje, zda modelClass je KvizViewModel
+        if (modelClass.isAssignableFrom(KvizViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+
+            // Vr·tÌ novou instanci KvizViewModel s p¯edan˝m repository
+            return KvizViewModel(repository) as T
+        }
+        // Pokud modelClass nenÌ KvizViewModel, vyhodÌ v˝jimku
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import eu.dlnauka.navestidlo.ui.datastore.Event
+
+// Definuje datovou t¯Ìdu pro poË·teËnÌ stav obrazovky testu
+data class TestScreenState(
+    val questionCount: Int = 0,
+    val correctAnswers: Int = 0,
+    val maxQuestionCount: Int = 10,
+    val showQuestionSelect: Boolean = true,
+    val showResults: Boolean = false,
+    val currentQuestion: Event? = null,
+    val answerOptions: List<String> = emptyList(),
+    val selectedAnswer: String? = null,
+    val showAnswers: Boolean = false
+)
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import androidx.compose.runtime.*
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import kotlinx.coroutines.launch
+
+// Definuje ViewModel pro obrazovku testu
+class TestViewModel(private val repository: NavestiRepository) : ViewModel() {
+
+    var state by mutableStateOf(TestScreenState())
+        private set
+
+    // Funkce pro nastavenÌ poËtu ot·zek
+    fun setQuestionCount(count: Int) {
+        state = state.copy(maxQuestionCount = count, questionCount = 0, correctAnswers = 0, showQuestionSelect = false)
+        loadNextQuestion()
+    }
+    // Funkce pro v˝bÏr odpovÏdi
+    fun selectAnswer(answer: String) {
+
+        // Nic se neprov·dÌ, pokud jiû je vybran· odpovÏÔ nebo nenÌ ot·zka aktu·lnÌ
+        if (state.selectedAnswer != null || state.currentQuestion == null) return
+
+        // ZjistÌ, zda je odpovÏÔ spr·vn·
+        val isCorrect = answer == state.currentQuestion?.correctAnswer
+        updateState {
+            copy(
+                selectedAnswer = answer,
+                correctAnswers = if (isCorrect) correctAnswers + 1 else correctAnswers,
+                showAnswers = true
+            )
+        }
+        viewModelScope.launch {
+
+            // Po kr·tkÈ prodlevÏ se naËte dalöÌ ot·zka nebo se zobrazÌ v˝sledky celÈho testu
+            kotlinx.coroutines.delay(1000L)
+            if (state.questionCount + 1 >= state.maxQuestionCount) {
+                state = state.copy(showResults = true)
+            } else {
+                updateState { copy(showAnswers = false) }
+                loadNextQuestion()
+            }
+        }
+    }
+    // Funkce pro naËtenÌ dalöÌ ot·zky
+    private fun loadNextQuestion() {
+        viewModelScope.launch {
+            repository.getRandomQuestion()?.let { (event, answers) ->
+                updateState {
+                    copy(
+                        currentQuestion = event,
+                        answerOptions = answers,
+                        selectedAnswer = null,
+                        showAnswers = false,
+                        questionCount = questionCount + 1
+                    )
+                }
+            } ?: updateState { copy(showResults = true) }
+        }
+    }
+    // Funkce aktualizujÌcÌ stav
+    private fun updateState(update: TestScreenState.() -> TestScreenState) {
+        state = update(state)
+    }
+    // Funkce pro restartov·nÌ celÈho testutestu
+    fun restartTest() {
+        state = TestScreenState()
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+
+// Definuje t¯Ìdu pro vytv·¯enÌ instancÌ ViewModelu
+class TestViewModelFactory(private val repository: NavestiRepository) : ViewModelProvider.Factory {
+
+    // P¯episuje metodu create, kter· vytvo¯Ì ViewModel
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+
+        // Zkontroluje, zda modelClass je TestViewModel
+        if (modelClass.isAssignableFrom(TestViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+
+            // Vr·tÌ novou instanci TestViewModel s p¯edan˝m repository
+            return TestViewModel(repository) as T
+        }
+        // Pokud modelClass nenÌ TestViewModel, vyhodÌ v˝jimku
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.classes
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.screens.MainScreen
+
+// Definuje t¯Ìdu TrenazerActivity jako podt¯Ìdu ComponentActivity
+class TrenazerActivity : ComponentActivity() {
+
+    // P¯epÌöe metodu onCreate, kter· se zavol· p¯i vytvo¯enÌ aktivity
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Definice v˝razu pro ukonËenÌ aplikace
+        val onExitApp: () -> Unit = {
+            finish()
+        }
+        // NastavÌ obsah aktivity na hlavnÌ obrazovku kde p¯ed· repository a funkci pro ukonËenÌ aplikace
+        setContent {
+            MainScreen(repository = NavestiRepository(), onExitApp = onExitApp)
+        }
+    }
+}
+
+
+DATASTORE
+
+package eu.dlnauka.navestidlo.ui.datastore
+
+import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
+
+// Definuje datovou t¯Ìdu Event pro reprezentaci ud·losti
+data class Event(
+    val description: Map<String, String> = emptyMap(),
+    val name: Map<String, String> = emptyMap(),
+    val isAllTab120Visible: Boolean = false,
+    val isAllHeadSignalVisible: Boolean = false,
+    val isShowLinesVisible: Boolean = false,
+    val signalColors: List<AllBlinkingColors> = emptyList(),
+    val isAllSpeedLinesVisible: Boolean = false,
+    val speedLinesColors: List<AllBlinkingColors> = emptyList(),
+    val isAllTabNumberVisible: Boolean = false,
+    val allTabNumberText: String = "",
+    val isAllTabPictureVisible: Boolean = false,
+    val allTabPictureText: String = "",
+    val isAllShiftBoxVisible: Boolean = false,
+    val shiftColors: List<AllBlinkingColors> = emptyList(),
+    val correctAnswer: String? = null
+)
+
+
+package eu.dlnauka.navestidlo.ui.datastore
+
+import android.util.Log
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestore
+import eu.dlnauka.navestidlo.ui.classes.ColorParser
+import eu.dlnauka.navestidlo.ui.utils.localized
+import kotlinx.coroutines.tasks.await
+
+// Implementace t¯Ìdy, kter· komunikuje s Firestore
+class FirestoreDataSource(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+) : NavestiDataSource {
+
+    // ZÌsk·nÌ seznamu n·vÏstÌ (id + n·zev)
+    override suspend fun getNavestiList(): List<Pair<String, String>> {
+        return try {
+            val documents = firestore.collection("Navestidla").get().await()
+            documents.map {
+                val nameMap = it.get("Name") as? Map<String, String> ?: emptyMap()
+                val name = nameMap.localized()
+                Pair(it.id, name)
+            }
+        } catch (e: Exception) {
+            Log.e("FirestoreDataSource", "Chyba p¯i ËtenÌ dat", e)
+            emptyList()
+        }
+    }
+
+    // ZÌsk·nÌ n·hodnÈho dokumentu z kolekce "N·vÏsti"
+    override suspend fun getRandomEventDocument(): DocumentSnapshot? {
+        return try {
+            val documents = firestore.collection("Navestidla").get().await()
+            documents.documents.randomOrNull()
+        } catch (e: Exception) {
+            Log.e("FirestoreDataSource", "Chyba p¯i ËtenÌ dat", e)
+            null
+        }
+    }
+
+    // ZÌsk·nÌ konkrÈtnÌ ud·losti podle jejÌ ID
+    override suspend fun getEvent(eventId: String): Event? {
+        return try {
+            val document = firestore.collection("Navestidla").document(eventId).get().await()
+            if (document.exists()) {
+                val data = document.data ?: return null
+                Event(
+                    name = data["Name"] as? Map<String, String> ?: emptyMap(),
+                    description = data["Description"] as? Map<String, String> ?: emptyMap(),
+                    isAllTab120Visible = data["tab120Visible"] as? Boolean ?: false,
+                    isAllHeadSignalVisible = data["hlavniNavestidloVisible"] as? Boolean ?: false,
+                    isShowLinesVisible = data["showLines"] as? Boolean ?: false,
+                    signalColors = (data["signalColors"] as? List<*>)?.map { ColorParser.parseBlinkColor(it.toString()) } ?: emptyList(),
+                    isAllSpeedLinesVisible = data["rychlPruhyVisible"] as? Boolean ?: false,
+                    speedLinesColors = (data["pruhyColors"] as? List<*>)?.map { ColorParser.parseBlinkColor(it.toString()) } ?: emptyList(),
+                    isAllTabNumberVisible = data["tabCislaVisible"] as? Boolean ?: false,
+                    allTabNumberText = data["tabCislaText"] as? String ?: "",
+                    isAllTabPictureVisible = data["tabObrazceVisible"] as? Boolean ?: false,
+                    allTabPictureText = data["tabObrazceText"] as? String ?: "",
+                    isAllShiftBoxVisible = data["posunBoxVisible"] as? Boolean ?: false,
+                    shiftColors = (data["posunColors"] as? List<*>)?.map { ColorParser.parseBlinkColor(it.toString()) } ?: emptyList()
+                )
+            } else null
+        } catch (e: Exception) {
+            Log.e("FirestoreDataSource", "Chyba p¯i ËtenÌ dat", e)
+            null
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.datastore
+
+import com.google.firebase.firestore.DocumentSnapshot
+
+// RozhranÌ pro zÌsk·nÌ dat o n·vÏstÌch
+interface NavestiDataSource {
+    suspend fun getRandomEventDocument(): DocumentSnapshot?
+    suspend fun getEvent(eventId: String): Event?
+    suspend fun getNavestiList(): List<Pair<String, String>>
+}
+
+
+package eu.dlnauka.navestidlo.ui.datastore
+
+import android.util.Log
+import com.google.firebase.firestore.DocumentSnapshot
+import eu.dlnauka.navestidlo.ui.utils.localized
+// import com.google.firebase.perf.FirebasePerformance
+
+// Repository vrstva, kter· zajiöùuje p¯Ìstup k dat˘m.
+class NavestiRepository(
+
+    // V˝chozÌ implementace s Firestore
+    private val dataSource: NavestiDataSource = FirestoreDataSource()
+) {
+    // ZÌsk· seznam n·vÏstÌ (id + n·zev)
+    suspend fun getNavestiList(): List<Pair<String, String>> {
+        return try {
+
+            // PouûitÌ mezivrstvy pro zÌsk·nÌ dat
+            dataSource.getNavestiList()
+        } catch (e: Exception) {
+            Log.e("NvestiRepository", "getNavestiList() failed", e)
+            emptyList()
+        }
+    }
+
+    // ZÌsk· konkrÈtnÌ ud·lost podle jejÌho ID
+    suspend fun getEvent(eventId: String): Event? {
+        // val trace = FirebasePerformance.getInstance().newTrace("get_event_trace")
+        return try {
+            // trace.start()
+
+            // PouûitÌ mezivrstvy pro zÌsk·nÌ dat
+            val event = dataSource.getEvent(eventId)
+            // trace.stop()
+            event
+        } catch (e: Exception) {
+            // trace.stop()
+            Log.e("NvestiRepository", "getEvent() failed", e)
+            null
+        }
+    }
+
+    // ZÌsk· n·hodn˝ dokument z kolekce "N·vÏsti"
+    suspend fun getRandomEventDocument(): DocumentSnapshot? {
+        return dataSource.getRandomEventDocument()
+    }
+
+    // Vytvo¯Ì n·hodnou ot·zku pro kvÌz
+    suspend fun getRandomQuestion(): Pair<Event, List<String>>? {
+        return try {
+            // NaËte vöechny dokumenty z kolekce "N·vÏsti"
+            val documents = dataSource.getNavestiList()
+
+            // Vybere n·hodn˝ dokument z naËten˝ch dokument˘
+            val randomDoc = documents.randomOrNull() ?: return null
+            val event = getEvent(randomDoc.first) ?: return null
+
+            // ZÌsk· lokalizovan˝ n·zev ud·losti
+            val correctName = event.name.localized()
+
+            // Vybere n·hodnÈ nespr·vnÈ odpovÏdi kromÏ spr·vnÈ
+            val randomWrongAnswers = documents
+                .map { it.second }
+                .filterNot { it == correctName }
+                .shuffled()
+                .take(2)
+
+            // Vytvo¯Ì seznam odpovÏdÌ a zamÌch·
+            val answerOptions = (randomWrongAnswers + correctName).shuffled()
+
+            // Aktualizuje event se spr·vnou odpovÏdÌ
+            val updatedEvent = event.copy(correctAnswer = correctName)
+
+            Pair(updatedEvent, answerOptions)
+        } catch (e: Exception) {
+            Log.e("NvestiRepository", "getRandomQuestion() failed", e)
+            null
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.localization
+
+enum class AppLanguage(val code: String, val emoji: String) {
+    CZECH("cs", "????"),
+    GERMAN("de", "????")
+}
+
+
+package eu.dlnauka.navestidlo.ui.localization
+
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
+import java.util.Locale
+
+private val Context.dataStore by preferencesDataStore(name = "settings")
+private val LANGUAGE_KEY = stringPreferencesKey("language")
+
+object LanguagePreferenceManager {
+
+    suspend fun saveLanguage(context: Context, lang: String) {
+        context.dataStore.edit { prefs ->
+            prefs[LANGUAGE_KEY] = lang
+        }
+    }
+
+    private suspend fun getSavedLanguage(context: Context): String? {
+        return context.dataStore.data.first()[LANGUAGE_KEY]
+    }
+
+    suspend fun resolveAppLanguage(
+        context: Context,
+        supportedLanguages: List<String> = AppLanguage.entries.map { it.code }
+    ): String {
+        val saved = getSavedLanguage(context)
+        if (saved != null && saved in supportedLanguages) return saved
+
+        val systemLang = Locale.getDefault().language
+        return if (systemLang in supportedLanguages) systemLang else "cs"
+    }
+}
+
+
+@file:Suppress("DEPRECATION")
+
+package eu.dlnauka.navestidlo.ui.localization
+
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.res.Configuration
+import java.util.*
+
+fun Context.wrapWithLocale(language: String): ContextWrapper {
+    val locale = Locale(language)
+    Locale.setDefault(locale)
+    val config = Configuration(resources.configuration)
+    config.setLocale(locale)
+    config.setLayoutDirection(locale)
+
+    val newContext =
+        createConfigurationContext(config)
+
+    return ContextWrapper(newContext)
+}
+
+
+package eu.dlnauka.navestidlo.ui.localization
+
+import android.content.Context
+import androidx.compose.runtime.compositionLocalOf
+
+val LocalLocalizedContext = compositionLocalOf<Context> {
+    error("No localized context provided")
+}
+
+
+UTILS
+
+package eu.dlnauka.navestidlo.ui.utils
+
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import java.util.Locale
+
+fun Map<String, String>.localized(defaultLang: String = "cs"): String {
+    val currentLang = Locale.getDefault().language
+    return this[currentLang] ?: this[defaultLang] ?: values.firstOrNull() ?: ""
+}
+
+@Composable
+fun localizedString(@StringRes id: Int): String {
+    val ctx = LocalLocalizedContext.current
+    return remember(ctx, id) { ctx.getString(id) }
+}
+@Composable
+fun localizedString(@StringRes id: Int, vararg args: Any): String {
+    val ctx = LocalLocalizedContext.current
+    return remember(ctx, id, *args) { ctx.getString(id, *args) }
+}
+
+
+UI.COMPONENTS
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
+import eu.dlnauka.navestidlo.R
+
+// Definice pro kompozici zobrazenÌ pozadÌ s obr·zkem
+@Composable
+fun BackgroundImage(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(id = R.drawable.navestidla2),
+        contentDescription = null,
+        modifier = modifier.fillMaxSize(),
+        contentScale = ContentScale.FillBounds
+    )
+}
+// N·hled kompozice BackgroundImage
+@Preview
+@Composable
+fun PreviewBackgroundImage() {
+    BackgroundImage()
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+
+// Definuje vyhrazenou t¯Ìdu pro barvy, kterÈ mohou b˝t buÔ jednobarevnÈ nebo blikajÌcÌ
+sealed class AllBlinkingColors {
+    data class SolidColor(val color: Color, val description: String? = null) : AllBlinkingColors()
+    data class Blinking(val color1: Color, val color2: Color, val speed: Int, val description: String? = null) : AllBlinkingColors()
+}
+// Definice kompozice pro blikajÌcÌ tlaËÌtka
+@Composable
+fun BlinkingButton(
+    modifier: Modifier = Modifier,
+    blinkingColor: AllBlinkingColors,
+    onClick: (() -> Unit)? = null,
+    shape: Shape = CircleShape,
+    animationKey: Any = Unit
+) {
+    val color = when (blinkingColor) {
+        is AllBlinkingColors.SolidColor -> blinkingColor.color
+        is AllBlinkingColors.Blinking -> {
+
+            // Vytv·¯enÌ animace pro blikajÌcÌ barvy
+            val transition = remember(animationKey) { Animatable(1f) }
+            LaunchedEffect(transition) {
+                transition.animateTo(
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(
+                            durationMillis = blinkingColor.speed,
+                            easing = LinearEasing
+                        ),
+                        repeatMode = RepeatMode.Reverse
+                    )
+                )
+            }
+            // P¯epÌn· se mezi dvÏma barvami podle hodnoty animace
+            if (transition.value > 0.5f) blinkingColor.color1 else blinkingColor.color2
+        }
+    }
+    // Definice vzhledu a chov·nÌ samotnÈho tlaËÌtka
+    Button(
+        onClick = onClick ?: {},
+        colors = ButtonDefaults.buttonColors(containerColor = color),
+        shape = shape,
+        modifier = modifier
+    ) {
+        Text(text = "")
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// Definice kompozice pro vlastnÌ tlaËÌtko
+@Composable
+fun AllCustomButton(
+    text: String,
+    onClick: () -> Unit,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    // Stav pro sledov·nÌ, zda bylo tlaËÌtko kliknuto
+    val buttonClicked = remember { mutableStateOf(false) }
+
+    // Vytvo¯enÌ tlaËÌtka s nastaven˝mi barvami, velikostÌ a funkcÌ kliknutÌ
+    Button(
+        onClick = {
+
+            // P¯i kliknutÌ na tlaËÌtko se nastavÌ stav na "true" a zavol· se p¯edan· funkce onClick
+            buttonClicked.value = true
+            onClick()
+        },
+        // NastavenÌ barev tlaËÌtka
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        // NastavenÌ tvaru tlaËÌtka
+        shape = MaterialTheme.shapes.small,
+
+        contentPadding = PaddingValues(4.dp),
+
+        modifier = modifier
+            .height(45.dp)
+            .border(1.dp, Color.White, shape = MaterialTheme.shapes.small)
+    ) {
+        // Text na tlaËÌtku
+        Text(
+            text = text,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import eu.dlnauka.navestidlo.R
+
+// Definice kompozice pro zobrazenÌ popisnÈho okna
+@Composable
+fun AllDescriptionBox(
+    description: String?,
+    onClose: () -> Unit,
+    showCloseButton: Boolean,
+    closeButtonText: String,
+    descriptionTextStyle: TextStyle,
+    descriptionAlignment: TextAlign,
+    content: @Composable () -> Unit
+) {
+    // Vytvo¯Ì se stav pro posouv·nÌ obsahu, pro p¯Ìpad obs·hlÈho textu
+    val scrollState = rememberScrollState()
+
+    // Vytvo¯enÌ hlavnÌho kontejneru pro popisnÈ okno
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Vytvo¯enÌ vnit¯nÌho kontejneru
+        Box(
+            modifier = Modifier
+                .wrapContentSize()
+                .padding(10.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(Color.Black)
+                .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+        ) {
+            // Uspo¯·d· obsah v sloupci s vertik·lnÌm posouv·nÌm
+            Column(
+                modifier = Modifier
+                    .padding(6.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // ZobrazÌ popis boxu, pokud nenÌ pr·zdn˝
+                if (!description.isNullOrEmpty()) {
+                    Text(
+                        text = description,
+                        style = descriptionTextStyle.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = descriptionAlignment
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .padding(bottom = 8.dp)
+                    )
+                }
+                // ZobrazÌ obsah p¯edan˝ do funkce
+                content()
+                Spacer(modifier = Modifier.height(8.dp))
+                if (showCloseButton) {
+                    AllDescriptionButton(
+                        text = closeButtonText,
+                        onClick = onClose
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+// Definice kompozice pro zobrazenÌ mod·lnÌho dialogu
+@Composable
+fun ModalDialog(content: @Composable () -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Transparent),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+// Definice kompozice pro vytvo¯enÌ vlastnÌho tlaËÌtka
+@Composable
+fun AllDescriptionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // TlaËÌtko s vlastnÌmi styly
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.White,
+            contentColor = Color.Black
+        ),
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier
+            .width(120.dp)
+            .height(50.dp)
+            .padding(2.dp)
+    ) {
+        Text(
+            text = text,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 3.dp, vertical = 3.dp)
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+
+// Definice kompozice pro zobrazenÌ vöech komponent n·vÏstidla
+@Composable
+fun AllHeadSignal(
+    isKvizScreen: Boolean,
+    modifier: Modifier = Modifier,
+    isAllTab120Visible: Boolean,
+    isAllHeadSignalVisible: Boolean,
+    isShowLinesVisible: Boolean,
+    signalColors: List<AllBlinkingColors>,
+    isAllSpeedLinesVisible: Boolean,
+    speedLinesColors: List<AllBlinkingColors>,
+    isAllTabNumberVisible: Boolean,
+    allTabNumberText: String,
+    isAllTabPictureVisible: Boolean,
+    allTabPictureText: String,
+    isAllShiftBoxVisible: Boolean,
+    shiftColors: List<AllBlinkingColors>,
+    onSignalColorsChange: (List<AllBlinkingColors>) -> Unit,
+    onAllTabPictureTextChange: (String) -> Unit,
+    onAllTabNumberTextChange: (String) -> Unit,
+    onSpeedLinesColorsChange: (List<AllBlinkingColors>) -> Unit,
+    scale: Float = 1.0f
+) {
+    // HlavnÌ sloupec obsahujÌcÌ jednotlivÈ komponenty celÈho n·vÏstidla
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .padding((16 * scale).dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy((8 * scale).dp)
+    ) {
+        // PodmÌnÏnÈ zobrazenÌ komponenty AllTab120
+        if (isAllTab120Visible) {
+            AllTab120(
+                modifier = Modifier,
+                scale = scale)
+        }
+        // PodmÌnÏnÈ zobrazenÌ komponenty AllHeadSignalBox nebo KvizHeadSignalBox, podle aktu·lnÌ obrazovky
+        if (isAllHeadSignalVisible) {
+            if (isKvizScreen) {
+                KvizHeadSignalBox(
+                    isVisible = true,
+                    showLines = isShowLinesVisible,
+                    onSignalColorsChange = onSignalColorsChange,
+                    resetTrigger = 1,
+                    modifier = Modifier,
+                    scale = scale
+                )
+            } else {
+                AllHeadSignalBox(
+                    signalColors = signalColors,
+                    isVisible = true,
+                    showLines = isShowLinesVisible,
+                    scale = scale,
+                    modifier = Modifier
+
+                )
+            }
+        }
+        // PodmÌnÏnÈ zobrazenÌ komponenty AllSpeedLines nebo KvizSpeedLines, podle aktu·lnÌ obrazovky
+        if (isAllSpeedLinesVisible) {
+            if (isKvizScreen) {
+                KvizSpeedLines(
+                    isVisible = true,
+                    resetState = false,
+                    onSpeedLinesColorsChange = onSpeedLinesColorsChange,
+                    resetTrigger = 1,
+                    modifier = Modifier
+                )
+            } else {
+                AllSpeedLines(
+                    speedLinesColors = speedLinesColors,
+                    modifier = Modifier,
+                    scale = scale)
+            }
+        }
+        // PodmÌnÏnÈ zobrazenÌ komponenty AllTabNumber
+        if (isAllTabNumberVisible) {
+            AllTabNumber(
+                allTabNumberText = allTabNumberText,
+                onAllTabNumberTextChange = onAllTabNumberTextChange,
+                modifier = Modifier,
+                scale = scale)
+        }
+        // PodmÌnÏnÈ zobrazenÌ komponenty AllTabPicture
+        if (isAllTabPictureVisible) {
+            AllTabPicture(
+                allTabPictureText = allTabPictureText,
+                onAllTabPictureTextChange = onAllTabPictureTextChange,
+                modifier = Modifier,
+                scale = scale)
+        }
+        // PodmÌnÏnÈ zobrazenÌ komponenty AllShiftBox
+        if (isAllShiftBoxVisible) {
+            AllShiftBox(
+                shiftColors = shiftColors,
+                modifier = Modifier,
+                scale = scale)
+        }
+    }
+}
+// Funkce pro n·hled komponenty AllHeadSignal
+@Preview
+@Composable
+fun PreviewAllHeadSignal() {
+    AllHeadSignal(
+        isKvizScreen = false,
+        isAllTab120Visible = false,
+        isAllHeadSignalVisible = true,
+        isShowLinesVisible = true,
+        signalColors = listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.Red),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+        ),
+        isAllSpeedLinesVisible = true,
+        speedLinesColors = listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray)
+        ),
+        isAllTabNumberVisible = false,
+        allTabNumberText = "",
+        isAllTabPictureVisible = false,
+        allTabPictureText = "",
+        isAllShiftBoxVisible = false,
+        shiftColors = listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+        ),
+        onSignalColorsChange = {},
+        onAllTabNumberTextChange = {},
+        onAllTabPictureTextChange = {},
+        onSpeedLinesColorsChange = {},
+        scale = 1.0f
+    )
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+// Definice kompozice pro zobrazenÌ boxu s hlavnÌm n·vÏstidlem
+@Composable
+fun AllHeadSignalBox(
+    modifier: Modifier = Modifier,
+    signalColors: List<AllBlinkingColors>,
+    isVisible: Boolean = true,
+    showLines: Boolean = true,
+    scale: Float = 1.0f
+) {
+    // Zobrazuje komponentu pouze, pokud je nastavena viditelnost
+    if (isVisible) {
+        Row(
+            modifier = modifier.wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // HlavnÌ sloupec s n·vÏstidly
+            Column(
+                modifier = Modifier
+                    .width((65 * scale).dp)
+                    .background(Color.Black)
+                    .padding((8 * scale).dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height((8 * scale).dp))
+                signalColors.forEach { color ->
+                    BlinkingButton(blinkingColor = color, onClick = null, modifier = Modifier.size((50 * scale).dp))
+                    Spacer(modifier = Modifier.height((8 * scale).dp))
+                }
+            }
+            // ZobrazenÌ pomocn˝ch pruh˘, pokud je nastavena jejich viditelnost
+            if (showLines) {
+                Column(
+                    modifier = Modifier
+                        .wrapContentSize()
+                        .padding(start = (2 * scale).dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val lineColors = listOf(
+                        Color.Red,
+                        Color.White,
+                        Color.Red,
+                        Color.White,
+                        Color.Red
+                    )
+                    lineColors.forEach { color ->
+                        Box(
+                            modifier = Modifier
+                                .width((15 * scale).dp)
+                                .height(if (color == Color.White) (50 * scale).dp else (70 * scale).dp)
+                                .background(color)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import android.app.Activity
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.ui.localization.AppLanguage
+import eu.dlnauka.navestidlo.ui.localization.LanguagePreferenceManager
+import kotlinx.coroutines.launch
+
+@Composable
+fun LanguageSelector(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    Row(
+        modifier = modifier.padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AppLanguage.entries.forEach { lang ->
+            Button(
+                onClick = {
+                    scope.launch {
+                        LanguagePreferenceManager.saveLanguage(context, lang.code)
+                        val activity = context as? Activity
+                        activity?.finish()
+                        activity?.startActivity(activity.intent)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                border = BorderStroke(1.dp, Color.White)
+            ) {
+                Text(text = lang.emoji, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+data class MenuItem(
+    val route: String,
+    @StringRes val labelRes: Int
+)
+
+// Definice kompozice pro zobrazenÌ menu boxu
+@Composable
+fun AllMenuBox(
+    screenName: String,
+    menuItems: List<MenuItem>,
+    onMenuOptionSelected: (String) -> Unit,
+    onExitApp: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // HlavnÌ sloupec obsahujÌcÌ menu box
+    Column(modifier = modifier.fillMaxWidth()) {
+
+        // HornÌ ¯·dek s tlaËÌtkem pro rozbalenÌ menu a n·zvem aktu·lnÌ obrazovky
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.Black)
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = { onExpandedChange(!expanded) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                ),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+            ) {
+                Text(
+                    text = if (expanded) "<<" else " ? ",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = MaterialTheme.typography.titleLarge.fontSize
+                )
+            }
+            Text(
+                text = screenName,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Start
+            )
+        }
+
+        // Dropdown menu obsahujÌcÌ moûnosti celÈho menu
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) },
+            modifier = Modifier
+                .background(Color.Black)
+        ) {
+            menuItems.forEach { item ->
+                DropdownMenuItem(
+                    onClick = {
+                        onExpandedChange(false)
+                        onMenuOptionSelected(item.route)
+                    },
+                    text = {
+                        Text(
+                            text = localizedString(item.labelRes),
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
+                        )
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .background(Color.Black, shape = MaterialTheme.shapes.medium)
+                        .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+                )
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = Color.White.copy(alpha = 0.3f)
+            )
+            DropdownMenuItem(
+                onClick = {
+                    onExpandedChange(false)
+                    onExitApp()
+                },
+                text = {
+                    Text(
+                        text = localizedString(R.string.close_btn),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center
+                    )
+                },
+                modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .background(Color.Red, shape = MaterialTheme.shapes.medium)
+                    .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+            )
+            DropdownMenuItem(
+                text = { LanguageSelector() },
+                onClick = {},
+                enabled = false
+            )
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+// Definice kompozice pro zobrazenÌ boxu s hlavnÌm posunem
+@Composable
+fun AllShiftBox(
+    modifier: Modifier = Modifier,
+    shiftColors: List<AllBlinkingColors>,
+    isVisible: Boolean = true,
+    scale: Float = 1.0f
+){
+    // Zobrazuje komponentu pouze, pokud je nastavena viditelnost
+    if (isVisible) {
+        Row(
+            modifier = modifier.wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // HlavnÌ sloupec s nastavenÌm pro posunovÈ n·vÏstidlo
+            Column(
+                modifier = Modifier
+                    .width((65 * scale).dp)
+                    .background(Color.Black)
+                    .padding((8 * scale).dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height((8 * scale).dp))
+                shiftColors.forEach { color ->
+                    BlinkingButton(
+                        blinkingColor = color,
+                        onClick = null,
+                        modifier = Modifier.size((50 * scale).dp)
+                    )
+                    Spacer(modifier = Modifier.height((8 * scale).dp))
+                }
+            }
+            // VedlejöÌ sloupec s pomocn˝mi pruhy
+            Column(
+                modifier = Modifier.wrapContentSize()
+                    .padding(start = (2 * scale).dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val lineColors = listOf(Color(0xFF6200EE), Color.White)
+                lineColors.forEach { color ->
+                    Box(
+                        modifier = Modifier.width((15 * scale).dp)
+                            .height((64 * scale).dp)
+                            .background(color)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+// Definice kompozice pro zobrazenÌ tabulky rychlostnÌch pruh˘
+@Composable
+fun AllSpeedLines(
+    modifier: Modifier = Modifier,
+    speedLinesColors: List<AllBlinkingColors>,
+    isVisible: Boolean = true,
+    scale: Float = 1.0f
+) {
+    // Zobrazuje komponentu pouze, pokud je nastavena viditelnost
+    if (isVisible) {
+
+        // Vytvo¯Ì ¯·dek pro rychlostnÌ pruhy
+        Row(
+            modifier = modifier.wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // Vytvo¯Ì sloupec pro jednotlivÈ rychlostnÌ pruhy
+            Column(
+                modifier = Modifier
+                    .width((82 * scale).dp)
+                    .background(Color.Black)
+                    .padding((8 * scale).dp),
+                verticalArrangement = Arrangement.spacedBy((8 * scale).dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                speedLinesColors.forEach { color ->
+                    BlinkingButton(
+                        blinkingColor = color,
+                        onClick = null,
+                        shape = RoundedCornerShape((4 * scale).dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height((15 * scale).dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// Definice kompozice pro zobrazenÌ ËÌsla tabulky indik·toru
+@Composable
+fun AllTab120(
+    modifier: Modifier = Modifier,
+    isVisible: Boolean = true,
+    scale: Float = 1.0f) {
+
+    // Zobrazuje komponentu pouze, pokud je nastavena viditelnost
+    if (isVisible) {
+
+        // Vytvo¯Ì box pro zobrazenÌ ËÌsla s pozadÌm
+        Box(
+            modifier = modifier
+                .wrapContentSize()
+                .background(Color.Black)
+                .padding((6 * scale).dp)
+        ) {
+            Text(
+                text = "12",
+                color = Color(0xFFFFD700),
+                fontSize = (55 * scale).sp,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// Definice kompozice pro zobrazenÌ rychlostnÌch tabulek
+@Composable
+fun AllTabNumber(
+    modifier: Modifier = Modifier,
+    allTabNumberText: String,
+    isVisible: Boolean = true,
+    onAllTabNumberTextChange: (String) -> Unit,
+    scale: Float = 1.0f
+) {
+    // Zobrazuje komponentu pouze, pokud je nastavena viditelnost
+    if (isVisible) {
+
+        // Vytvo¯Ì box pro zobrazenÌ textu s pozadÌm
+        Box(
+            modifier = modifier
+                .size((80 * scale).dp)
+                .background(Color.Black)
+                .padding((6 * scale).dp)
+        ) {
+            Text(
+                text = allTabNumberText,
+                color = Color.White,
+                fontSize = (55 * scale).sp,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        // Vol· funkci zmÏny tabulky p¯i zmÏnÏ textu
+        onAllTabNumberTextChange(allTabNumberText)
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import android.annotation.SuppressLint
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+
+// Definice kompozice pro zobrazenÌ tabulky s obr·zkem
+@Composable
+fun AllTabPicture(
+    modifier: Modifier = Modifier,
+    allTabPictureText: String,
+    isVisible: Boolean = true,
+    onAllTabPictureTextChange: (String) -> Unit,
+    scale: Float = 1.0f
+) {
+    // Zobrazuje komponentu pouze, pokud je nastavena viditelnost
+    if (isVisible) {
+        Box(
+            modifier = modifier
+                .wrapContentSize()
+                .background(Color.Black)
+        ) {
+            // ZÌsk· ID zdroje obr·zku podle jeho n·zvu
+            val imageResourceId = getDrawableResIdByName(allTabPictureText)
+            Image(
+                painter = painterResource(id = imageResourceId),
+                contentDescription = null,
+                modifier = Modifier
+                    .size((90 * scale).dp)
+                    .padding((4 * scale).dp),
+                contentScale = ContentScale.Fit
+            )
+        }
+        // Vol· funkci zmÏny tabulky p¯i zmÏnÏ textu
+        onAllTabPictureTextChange(allTabPictureText)
+    }
+}
+// KompozitnÌ funkce pro zÌsk·nÌ ID zdroje obr·zku podle jmÈna
+@SuppressLint("DiscouragedApi")
+@Composable
+fun getDrawableResIdByName(name: String): Int {
+    val context = LocalContext.current
+    return context.resources.getIdentifier(name, "drawable", context.packageName)
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// Definice kompozice pro zobrazenÌ textovÈho bloku
+@Composable
+fun AllTextBlock(
+    assignment: String,
+    modifier: Modifier = Modifier,
+    textColor: Color = Color.Black,
+    backgroundColor: Color = Color(0xFFFFD700),
+    fontSize: Int = 16,
+    fontWeight: FontWeight = FontWeight.Normal,
+    textAlign: TextAlign = TextAlign.Center,
+    maxLines: Int = 2
+) {
+    // OpravÌ form·tov·nÌ textu, d˘leûitÈ p¯i zalamov·nÌ textu
+    val fixedAssignment = assignment.replace("km/h", "km\u00A0/\u00A0h")
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(4.dp)
+    ) {
+        Text(
+            text = fixedAssignment,
+            color = textColor,
+            fontSize = fontSize.sp,
+            fontWeight = fontWeight,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(backgroundColor, shape = MaterialTheme.shapes.small)
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            textAlign = textAlign,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.MutableState
+import androidx.compose.ui.graphics.Color
+import eu.dlnauka.navestidlo.ui.classes.KvizViewModel
+import eu.dlnauka.navestidlo.ui.classes.KvizScreenState
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+// Definice kompozice pro zobrazenÌ ovl·dacÌch tlaËÌtek kvÌzu
+@Composable
+fun KvizControlButtons(
+
+    // ViewModel obsahujÌcÌ stav aplikace
+    viewModel: KvizViewModel,
+
+    // Aktu·lnÌ stav obrazovky kvÌzu
+    kvizScreenStates: MutableState<KvizScreenState>
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp)
+    ) {
+        // TlaËÌtko pro p¯epnutÌ viditelnosti "Indik·tor 120"
+        AllCustomButton(
+            text = localizedString(R.string.indikator_120),
+            onClick = {
+                val newValue = !kvizScreenStates.value.isAllTab120Visible
+                kvizScreenStates.value = kvizScreenStates.value.copy(isAllTab120Visible = newValue)
+                viewModel.isAllTab120Visible.value = newValue
+            },
+            containerColor = Color.Black,
+            contentColor = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+        // TlaËÌtko pro p¯epÌn·nÌ mezi indik·tory
+        AllCustomButton(
+            text = localizedString(R.string.indikatory),
+            onClick = {
+                var newState = kvizScreenStates.value
+                if (newState.isAllTabPictureVisible) {
+                    newState = newState.resetAllTabPicture()
+                    viewModel.isAllTabPictureVisible.value = false
+                }
+                newState = newState.showNextAllTabNumber()
+                kvizScreenStates.value = newState
+                viewModel.isAllTabNumberVisible.value = newState.isAllTabNumberVisible
+                viewModel.isKvizSpeedLinesVisible.value = newState.isKvizSpeedLinesVisible
+            },
+            containerColor = Color.Black,
+            contentColor = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+        // TlaËÌtko pro p¯epÌn·nÌ tabulek
+        AllCustomButton(
+            text = localizedString(R.string.tabulky),
+            onClick = {
+                var newState = kvizScreenStates.value
+                if (newState.isAllTabNumberVisible) {
+                    newState = newState.resetAllTabNumber()
+                    viewModel.isAllTabNumberVisible.value = false
+                }
+                newState = newState.showNextAllTabPicture()
+                kvizScreenStates.value = newState
+                viewModel.isAllTabPictureVisible.value = newState.isAllTabPictureVisible
+                viewModel.isKvizSpeedLinesVisible.value = newState.isKvizSpeedLinesVisible
+            },
+            containerColor = Color.Black,
+            contentColor = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.Color
+import eu.dlnauka.navestidlo.ui.classes.KvizScreenState
+
+// Definice kompozice pro dynamickÈ zobrazenÌ prvk˘ kvÌzu
+@Composable
+fun KvizDynamicComponents(
+    kvizScreenStates: KvizScreenState,
+
+    // UrËuje, zda se jedn· o kvÌzovou obrazovku, pro pouûitÌ interaktivnÌch prvk˘
+    isKvizScreen: Boolean,
+
+    // Callbacky pro zmÏnu barev sign·l˘ a tabulek
+    onSignalColorsChange: (List<AllBlinkingColors>) -> Unit,
+    onAllTabNumberTextChange: (String) -> Unit,
+    onAllTabPictureTextChange: (String) -> Unit,
+    onSpeedLinesColorsChange: (List<AllBlinkingColors>) -> Unit,
+
+    // Trigger pro resetov·nÌ barev
+    resetTrigger: Int
+) {
+    // Automatick· inicializace barev p¯i zmÏnÏ resetTriggeru
+    LaunchedEffect(resetTrigger) {
+        onSpeedLinesColorsChange(
+            listOf(
+                AllBlinkingColors.SolidColor(Color.DarkGray),
+                AllBlinkingColors.SolidColor(Color.DarkGray)
+            )
+        )
+        onSignalColorsChange(
+            listOf(
+                AllBlinkingColors.SolidColor(Color.DarkGray),
+                AllBlinkingColors.SolidColor(Color.DarkGray),
+                AllBlinkingColors.SolidColor(Color.DarkGray),
+                AllBlinkingColors.SolidColor(Color.DarkGray),
+                AllBlinkingColors.SolidColor(Color.DarkGray)
+            )
+        )
+    }
+    // ZobrazenÌ Indik·toru 120, pokud je aktivnÌ
+    if (kvizScreenStates.isAllTab120Visible) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .padding(top = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AllTab120()
+        }
+    }
+    // ZobrazenÌ interaktivnÌho n·vÏstidla
+    if (kvizScreenStates.isKvizHeadSignalBoxVisible) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isKvizScreen) {
+                KvizHeadSignalBox(
+                    modifier = Modifier,
+                    isVisible = true,
+                    showLines = false,
+                    onSignalColorsChange = onSignalColorsChange,
+                    resetTrigger = resetTrigger
+                )
+            } else {
+                AllHeadSignalBox(
+                    modifier = Modifier,
+                    signalColors = listOf(),
+                    isVisible = true,
+                    showLines = true
+                )
+            }
+        }
+    }
+    // DynamickÈ p¯epÌn·nÌ mezi r˘zn˝mi tabulkami a rychlostnÌmi pruhy
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            kvizScreenStates.isAllTabNumberVisible -> {
+                if (kvizScreenStates.currentAllTabNumberIndex in 0 until
+                    kvizScreenStates.numbers.size
+                ) {
+                    AllTabNumber(
+                        modifier = Modifier,
+                        allTabNumberText =
+                        kvizScreenStates.numbers[kvizScreenStates.currentAllTabNumberIndex],
+                        onAllTabNumberTextChange = onAllTabNumberTextChange
+                    )
+                }
+            }
+            kvizScreenStates.isAllTabPictureVisible -> {
+                if (kvizScreenStates.currentAllTabPictureIndex in 0 until
+                    kvizScreenStates.pictures.size
+                ) {
+                    AllTabPicture(
+                        modifier = Modifier,
+                        allTabPictureText =
+                        kvizScreenStates.pictures[kvizScreenStates.currentAllTabPictureIndex],
+                        onAllTabPictureTextChange = onAllTabPictureTextChange
+                    )
+                }
+            }
+            else -> {
+                if (isKvizScreen) {
+                    KvizSpeedLines(
+                        modifier = Modifier,
+                        isVisible = true,
+                        resetState = !kvizScreenStates.isKvizSpeedLinesVisible,
+                        onSpeedLinesColorsChange = onSpeedLinesColorsChange,
+                        resetTrigger = resetTrigger
+                    )
+                } else {
+                    AllSpeedLines(
+                        modifier = Modifier,
+                        speedLinesColors = kvizScreenStates.speedLinesColors
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.text.font.FontWeight
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+// Deklarace composable funkce pro vytvo¯enÌ hlaviËky kvÌzu
+@Composable
+fun KvizHeaderRow(
+
+    // Funkce pro naËtenÌ n·hodnÈ ud·losti
+    loadRandomEvent: () -> Unit,
+
+    // Funkce pro kontrolu nastavenÌ
+    checkSettings: () -> Unit
+) {
+    // HlavnÌ ¯·dek, kter˝ obsahuje text a dvÏ tlaËÌtka
+    Row(
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.4f))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = localizedString(R.string.quiz_title),
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+            // TlaËÌtko pro naËtenÌ n·hodnÈ ud·losti
+            AllCustomButton(
+                text = localizedString(R.string.button_next),
+                onClick = loadRandomEvent,
+                containerColor = Color.Black,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 100.dp)
+            )
+            // TlaËÌtko pro kontrolu nastavenÌ
+            AllCustomButton(
+                text = localizedString(R.string.button_check),
+                onClick = checkSettings,
+                containerColor = Color.Black,
+                contentColor = Color(0xFFFFA500),
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 100.dp)
+            )
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun KvizHeadSignalBox(
+    modifier: Modifier = Modifier,
+    isVisible: Boolean = true,
+    showLines: Boolean = true,
+    onSignalColorsChange: (List<AllBlinkingColors>) -> Unit,
+    scale: Float = 1.0f,
+    resetTrigger: Int
+) {
+    // Vytv·¯Ìm seznam spektra barev pro tlaËÌtka
+    val buttonColorSpectrums = listOf(
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color(0xFFFFA500)),
+            AllBlinkingColors.Blinking(Color(0xFFFFA500), Color.DarkGray, 1111),
+            AllBlinkingColors.Blinking(Color(0xFFFFA500), Color.DarkGray, 600)
+        ),
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.Green),
+            AllBlinkingColors.Blinking(Color.Green, Color.DarkGray, 1111),
+            AllBlinkingColors.Blinking(Color.Green, Color.DarkGray, 600)
+        ),
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.Red)
+        ),
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.White),
+            AllBlinkingColors.Blinking(Color.White, Color.DarkGray, 1111),
+            AllBlinkingColors.SolidColor(Color.Blue),
+            AllBlinkingColors.Blinking(Color.Blue, Color.DarkGray, 1111)
+        ),
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color(0xFFFFA500))
+        )
+    )
+    // Index oznaËuje, kter· barva je zvolena
+    val currentIndices = remember { mutableStateListOf(*Array(buttonColorSpectrums.size) { 0 }) }
+
+    // Hodnota pro klÌËe animacÌ, kterÈ mohou b˝t pouûity pro obnovenÌ animace.
+    val animationKeys = remember { mutableStateListOf(*Array(buttonColorSpectrums.size) { 0 }) }
+
+    // Tento efekt se spustÌ p¯i zmÏnÏ hodnoty "resetTrigger"
+    LaunchedEffect(resetTrigger) {
+        currentIndices.indices.forEach { index ->
+            currentIndices[index] = 0
+            animationKeys[index]++
+        }
+
+        onSignalColorsChange(buttonColorSpectrums.map { it[0] })
+    }
+    // Pokud je isVisible == true, vykreslÌ se celÈ UI.
+    if (isVisible) {
+
+        Row(
+            modifier = modifier.wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+
+            Column(
+                modifier = Modifier
+                    .width((65 * scale).dp)
+                    .background(Color.Black)
+                    .padding((8 * scale).dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height((8 * scale).dp))
+
+                // Pro kaûdÈ tlaËÌtko vykreslÌme animaci
+                buttonColorSpectrums.forEachIndexed { index, colors ->
+                    val currentColor = colors[currentIndices[index]]
+
+                    BlinkingButton(
+                        blinkingColor = currentColor,
+                        onClick = {
+
+                            // P¯i kliknutÌ na tlaËÌtko se zmÏnÌ index v seznamu barev
+                            currentIndices[index] = (currentIndices[index] + 1) % colors.size
+                            animationKeys[index]++
+                            onSignalColorsChange(buttonColorSpectrums.mapIndexed { idx, colorList ->
+                                colorList[currentIndices[idx]]
+                            })
+                        },
+                        modifier = Modifier.size((50 * scale).dp),
+                        animationKey = animationKeys[index]
+                    )
+                    Spacer(modifier = Modifier.height((8 * scale).dp))
+                }
+            }
+            // Pokud je nastavena hodnota showLines na true, vykreslÌ se pomocnÈ sign·lnÌ pruhy.
+            if (showLines) {
+                Column(
+                    modifier = Modifier
+                        .wrapContentSize()
+                        .padding(start = (2 * scale).dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Definice barev pruh˘, kterÈ jsou st¯ÌdavÏ ËervenÈ a bÌlÈ.
+                    val lineColors = listOf(
+                        Color.Red,
+                        Color.White,
+                        Color.Red,
+                        Color.White,
+                        Color.Red
+                    )
+                    lineColors.forEach { color ->
+                        Box(
+                            modifier = Modifier
+                                .width((15 * scale).dp)
+                                .height(if (color == Color.White) (50 * scale).dp else (70 * scale).dp)
+                                .background(color)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun KvizSpeedLines(
+    modifier: Modifier = Modifier,
+    isVisible: Boolean = true,
+    resetState: Boolean = false,
+    onSpeedLinesColorsChange: (List<AllBlinkingColors>) -> Unit,
+    resetTrigger: Int
+) {
+    // Vytvo¯Ìme seznam spektra barev pro tlaËÌtka
+    val buttonColorSpectrums = listOf(
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color(0xFFFFA500)),
+            AllBlinkingColors.SolidColor(Color.Green)
+        ),
+        listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.Green)
+        )
+    )
+
+    // Index oznaËuje, kter· barva je zvolena
+    val currentIndices = remember { mutableStateListOf(*Array(buttonColorSpectrums.size) { 0 }) }
+
+    // Tento efekt se spustÌ p¯i zmÏnÏ hodnoty "resetTrigger"
+    LaunchedEffect(resetTrigger) {
+        currentIndices.indices.forEach { currentIndices[it] = 0 }
+        onSpeedLinesColorsChange(buttonColorSpectrums.mapIndexed { idx, colors -> colors[currentIndices[idx]] })
+    }
+
+    // Pokud je resetState == true, resetujÌ se vöechny indexy
+    if (resetState) {
+        currentIndices.indices.forEach { currentIndices[it] = 0 }
+        onSpeedLinesColorsChange(buttonColorSpectrums.mapIndexed { idx, colors -> colors[currentIndices[idx]] })
+    }
+
+    // Pokud je true, vykreslÌ se celÈ UI.
+    if (isVisible) {
+        Row(
+            modifier = modifier.wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // TlaËÌtka, kter· budou mÌt nastavenu velikost a barvu podle v˝bÏru uûivatele
+            Column(
+                modifier = Modifier
+                    .width(82.dp)
+                    .background(Color.Black)
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Pro kaûdÈ tlaËÌtko vykreslÌme tlaËÌtko s odpovÌdajÌcÌ barvou, kter· se zmÏnÌ po kliknutÌ
+                buttonColorSpectrums.forEachIndexed { index, colors ->
+                    val currentColor = colors[currentIndices[index]]
+
+                    BlinkingButton(
+                        blinkingColor = currentColor,
+                        onClick = {
+
+                            currentIndices[index] = (currentIndices[index] + 1) % colors.size
+                            onSpeedLinesColorsChange(buttonColorSpectrums.mapIndexed { idx, colorList ->
+                                colorList[currentIndices[idx]]
+                            })
+                        },
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(15.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+@Composable
+fun TestCountSelect(onSelectionChanged: (Int) -> Unit) {
+
+    // Moûnosti pro v˝bÏr poËtu ot·zek
+    val options = listOf(10, 20, 30, 40, 50)
+
+    // Uchov·v· se aktu·lnÏ vybran· moûnost
+    var selectedOption by remember { mutableIntStateOf(options.first()) }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Radio button pro kaûdou moûnost
+        options.forEach { count ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // RadioButton pro v˝bÏr poËtu
+                RadioButton(
+                    selected = (count == selectedOption),
+                    onClick = { selectedOption = count }
+                )
+                Text(
+                    text = "$count",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // TlaËÌtko pro potvrzenÌ v˝bÏru.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            AllDescriptionButton(
+                text = localizedString(R.string.button_confirm),
+                onClick = { onSelectionChanged(selectedOption) }
+            )
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+@Composable
+fun TestProgressIndicators(
+    questionCount: Int,
+    maxQuestionCount: Int,
+    correctAnswers: Int
+) {
+    // ObalÌ obsah do Boxu s Ëern˝m pozadÌm, aby vytvo¯il ztmaven˝ efekt
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column {
+
+            // Zobrazuje text pro poËet ot·zek
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = localizedString(
+                    R.string.test_count_label,
+                    questionCount,
+                    maxQuestionCount
+                ),
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            // ZobrazenÌ progress baru pro poËet ot·zek.
+            LinearProgressIndicator(
+                progress = { questionCount.toFloat() / maxQuestionCount },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+                color = Color.Green,
+                trackColor = Color.Gray,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // V˝poËet procentu·lnÌ ˙spÏönosti a zobrazenÌ v˝sledku.
+            val percentagePerQuestion = 100f / maxQuestionCount
+            val successRate = correctAnswers * percentagePerQuestion
+
+            // Text pro zobrazenÌ procentu·lnÌ ˙spÏönosti
+            Text(
+                text = localizedString(
+                    R.string.test_success_rate,
+                    successRate.toInt()
+                ),
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            // DalöÌ progress bar zobrazuje pr˘bÏûnou ˙spÏönost
+            LinearProgressIndicator(
+                progress = { successRate / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+                color = Color.Green,
+                trackColor = Color.Red,
+            )
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import eu.dlnauka.navestidlo.ui.classes.TestScreenState
+
+@Composable
+fun TestQuestionView(
+    state: TestScreenState,
+    onAnswerSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // HlavnÌ Box, kter˝ obaluje vöechny komponenty
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(0.dp)
+    ) {
+        state.currentQuestion?.let { question ->
+
+            // VykreslenÌ ud·losti na n·vÏstidle, pokud existuje
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Lev· Ë·st - n·vÏstidlo
+                Column(
+                    modifier = Modifier
+                        .weight(0.3f)
+                        .padding(0.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    key(state.currentQuestion) {
+
+                        // VykreslenÌ n·vÏstidla pro aktu·lnÌ ot·zku.
+                        AllHeadSignal(
+                            isKvizScreen = false,
+                            isAllTab120Visible = question.isAllTab120Visible,
+                            isAllHeadSignalVisible = question.isAllHeadSignalVisible,
+                            isShowLinesVisible = question.isShowLinesVisible,
+                            signalColors = question.signalColors,
+                            isAllSpeedLinesVisible = question.isAllSpeedLinesVisible,
+                            speedLinesColors = question.speedLinesColors,
+                            isAllTabNumberVisible = question.isAllTabNumberVisible,
+                            allTabNumberText = question.allTabNumberText,
+                            isAllTabPictureVisible = question.isAllTabPictureVisible,
+                            allTabPictureText = question.allTabPictureText,
+                            isAllShiftBoxVisible = question.isAllShiftBoxVisible,
+                            shiftColors = question.shiftColors,
+                            onSignalColorsChange = {},
+                            onAllTabNumberTextChange = {},
+                            onAllTabPictureTextChange = {},
+                            onSpeedLinesColorsChange = {},
+                            modifier = Modifier
+                                .wrapContentSize()
+                                .padding(1.dp),
+                            scale = 0.6f
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Prav· Ë·st - tlaËÌtka pro odpovÏdi
+                Column(
+                    modifier = Modifier
+                        .weight(0.7f)
+                        .padding(horizontal = 0.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // ZÌsk·nÌ unik·tnÌch odpovÏdÌ z moûnostÌ
+                    val uniqueAnswers = state.answerOptions.distinct()
+
+                    uniqueAnswers.forEach { answer ->
+
+                        // UrËujeme barvu pozadÌ na z·kladÏ v˝bÏru odpovÏdi
+                        val backgroundColor = when {
+                            state.showAnswers && answer == question.correctAnswer -> Color.Green
+                            state.showAnswers && answer == state.selectedAnswer -> Color.Red
+                            else -> Color.Black
+                        }
+                        // Barva textu je nastavena na z·kladÏ barvy pozadÌ
+                        val textColor = if (backgroundColor == Color.Green || backgroundColor == Color.Red) Color.Black else Color.White
+
+                        // Vytvo¯enÌ tlaËÌtka pro kaûdou odpovÏÔ
+                        Button(
+                            onClick = { onAnswerSelected(answer) },
+                            colors = ButtonDefaults.buttonColors(containerColor = backgroundColor, contentColor = Color.White),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 70.dp)
+                                .padding(horizontal = 0.dp)
+                                .border(1.dp, Color.White, shape = MaterialTheme.shapes.small)
+                        ) {
+                            Text(
+                                text = answer.replace("km/h", "km\u00A0/\u00A0h"),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = textColor,
+                                overflow = TextOverflow.Clip,
+                                softWrap = true
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.ui.classes.TestScreenState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+@Composable
+fun TestResultsView(
+    state: TestScreenState,
+    onRestart: () -> Unit,
+    onMenuExpand: () -> Unit
+) {
+
+    // VypoËÌt·nÌ procentu·lnÌ ˙spÏönosti na z·kladÏ spr·vn˝ch odpovÏdÌ a celkovÈho poËtu ot·zek
+    val successRate = if (state.questionCount > 0) {
+        (state.correctAnswers.toFloat() / state.questionCount) * 100
+    } else 0f
+
+    // V˝sledek testu na z·kladÏ ˙spÏönosti
+    val resultText = if (successRate >= 80) localizedString(R.string.result_success) else localizedString(R.string.result_failure)
+
+    // Stav pro zobrazenÌ v˝sledku testu
+    val (showDescriptionBox, setShowDescriptionBox) = remember { mutableStateOf(true) }
+
+    // Pokud je zobrazenÌ povoleno, vykreslÌ se motivaËnÌ zpr·va
+    if (showDescriptionBox) {
+        MotivationalMessages(successRate, resultText, onRestart) {
+            onMenuExpand()  // Otev¯e menu
+            setShowDescriptionBox(false)  // Skryje popis
+        }
+    }
+}
+@Composable
+fun MotivationalMessages(successRate: Float, resultText: String, onRestart: () -> Unit, onMenuExpand: () -> Unit) {
+
+    val context = LocalLocalizedContext.current
+    // Zpr·vy, kterÈ se zobrazÌ podle zÌskanÈ ˙spÏönosti
+    val messages = if (successRate >= 80) {
+        context.resources.getStringArray(R.array.success_messages)
+    } else {
+        context.resources.getStringArray(R.array.failed_messages)
+    }
+
+    // N·hodnÏ vyberu jednu zpr·vu
+    val randomMessage = messages.random()
+
+    // Vytvo¯enÌ mod·lnÌho okna s v˝sledkem testu a motivaËnÌmi zpr·vami
+    ModalDialog(
+        onDismiss = {},
+        content = {
+            AllDescriptionBox(
+                description = resultText,
+                onClose = {},
+                showCloseButton = false,
+                closeButtonText = localizedString(R.string.button_close),
+                descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                ),
+                descriptionAlignment = TextAlign.Center,
+                content = {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth()
+                    ) {
+                        // ZobrazenÌ procentu·lnÌ ˙spÏönosti
+                        Text(
+                            text = localizedString(R.string.test_result, successRate.toInt()),
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = Color.White
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // ZobrazenÌ n·hodnÏ vybranÈ motivaËnÌ zpr·vy
+                        Text(
+                            text = randomMessage,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = Color.White
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // TlaËÌtka pro restartov·nÌ testu nebo n·vrat do menu
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            AllDescriptionButton(
+                                text = localizedString(R.string.button_retry),
+                                onClick = onRestart,
+                                modifier = Modifier.weight(1f).padding(end = 8.dp)
+                            )
+                            AllDescriptionButton(
+                                text = localizedString(R.string.button_menu),
+                                onClick = onMenuExpand,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            )
+        }
+    )
+}
+
+
+package eu.dlnauka.navestidlo.ui.components
+
+import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+import kotlinx.coroutines.launch
+
+@Composable
+fun TrenazerSpinner(
+
+    // Modifik·tor pro zmÏnu vzhledu
+    modifier: Modifier = Modifier,
+
+    // Repozit·¯ pro zÌsk·nÌ dat
+    repository: NavestiRepository,
+
+    // Callback pro vybr·nÌ poloûky
+    onItemSelected: (String) -> Unit
+) {
+    // Stav pro ovl·d·nÌ zobrazenÌ dropdown menu
+    var expanded by remember { mutableStateOf(false) }
+
+    // Stav vybranÈ poloûky - uchov·v· jen klÌË, nikoliv p¯eloûen˝ text
+    var selectedKey by remember { mutableStateOf<String?>(null) }
+
+    // Seznam poloûek
+    var items by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+
+    // Coroutine scope pro asynchronnÌ operace
+    val coroutineScope = rememberCoroutineScope()
+
+    // LaunchedEffect pro naËÌt·nÌ poloûek p¯i zobrazenÌ composable
+    val context = LocalLocalizedContext.current
+
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            items = try {
+                repository.getNavestiList()
+                    .map { Pair(it.first, it.second.replace("km/h", "km\u00A0/\u00A0h")) }
+            } catch (e: Exception) {
+                Log.e("TrenazerSpinner", "Chyba naËÌt·nÌ", e)
+
+                // Chyba p¯i naËÌt·nÌ dat
+                listOf(Pair("0", context.getString(R.string.event_load_error)))
+            }
+        }
+    }
+
+    // Box pro obalov·nÌ UI komponenty
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+    ) {
+        // Dynamicky vybran˝ text ñ buÔ hodnota ze seznamu, nebo v˝chozÌ text
+        val displayedText = selectedKey?.let { key ->
+            items.find { it.first == key }?.second
+        } ?: localizedString(R.string.dropdown_label)
+
+        // Text zobrazen˝ v rozbalenÈm spinneru
+        Text(
+            text = displayedText,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.Black)
+                .clickable { expanded = true }
+                .border(
+                    width = 1.dp,
+                    color = Color.White,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+        )
+
+        // Dropdown menu pro v˝bÏr poloûky
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 10.dp)
+                .fillMaxWidth(0.95f)
+        ) {
+            // Pro kaûdou poloûku v seznamu poloûek vytvo¯Ìm item
+            items.forEachIndexed { index, item ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            selectedKey = item.first
+                            expanded = false
+                            onItemSelected(item.first)
+                        }
+                        .padding(start = 8.dp, end = 8.dp)
+                ) {
+                    Text(
+                        text = item.second,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.Black, // Upravena barva textu v seznamu
+                        modifier = Modifier
+                            .padding(vertical = 10.dp)
+                            .fillMaxWidth()
+                    )
+                }
+                if (index < items.size - 1) {
+                    HorizontalDivider(
+                        thickness = 1.dp, // P¯id·nÌ tenkÈ linky mezi ud·losti
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+UI.SCREENS
+
+package eu.dlnauka.navestidlo.ui.screens
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.ui.components.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.classes.KvizScreenState
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.classes.KvizViewModel
+import eu.dlnauka.navestidlo.ui.classes.KvizViewModelFactory
+import eu.dlnauka.navestidlo.ui.localization.LanguagePreferenceManager
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localized
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+import kotlinx.coroutines.launch
+
+@Composable
+fun Kviz(
+    navController: NavController,
+    repository: NavestiRepository,
+    onExitApp: () -> Unit
+) {
+    val context = LocalLocalizedContext.current
+    val langCode by produceState(initialValue = "cs") {
+        value = LanguagePreferenceManager.resolveAppLanguage(context)
+    }
+
+    val viewModel: KvizViewModel = viewModel(factory = KvizViewModelFactory(repository))
+    val coroutineScope = rememberCoroutineScope()
+    var expanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadRandomEvent(context)
+    }
+
+    val visibilityStates = remember {
+        mutableStateOf(
+            KvizScreenState(
+                isAllTab120Visible = viewModel.isAllTab120Visible.value,
+                isAllTabNumberVisible = viewModel.isAllTabNumberVisible.value,
+                isAllTabPictureVisible = viewModel.isAllTabPictureVisible.value,
+                isKvizHeadSignalBoxVisible = viewModel.isKvizHeadSignalBoxVisible.value,
+                isKvizSpeedLinesVisible = viewModel.isKvizSpeedLinesVisible.value,
+                speedLinesColors = viewModel.speedLinesColors.value,
+                signalColors = viewModel.signalColors.value
+            )
+        )
+    }
+
+    LaunchedEffect(viewModel.resetTrigger.intValue) {
+        visibilityStates.value = KvizScreenState(
+            isAllTab120Visible = viewModel.isAllTab120Visible.value,
+            isAllTabNumberVisible = viewModel.isAllTabNumberVisible.value,
+            isAllTabPictureVisible = viewModel.isAllTabPictureVisible.value,
+            isKvizHeadSignalBoxVisible = viewModel.isKvizHeadSignalBoxVisible.value,
+            isKvizSpeedLinesVisible = viewModel.isKvizSpeedLinesVisible.value,
+            speedLinesColors = viewModel.speedLinesColors.value,
+            signalColors = viewModel.signalColors.value
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        BackgroundImage()
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                AllMenuBox(
+                    screenName = localizedString(R.string.screen_kviz),
+                    menuItems = listOf(
+                        MenuItem(Destinations.TRENAZER, R.string.trenazer_btn),
+                        MenuItem(Destinations.TEST, R.string.test_btn)),
+                    onMenuOptionSelected = { selectedScreen -> navController.navigate(selectedScreen) },
+                    onExitApp = onExitApp,
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                )
+
+                Button(
+                    onClick = { viewModel.resetNavestidlo() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    ),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+                ) {
+                    Text(
+                        text = localizedString(R.string.button_reset),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = MaterialTheme.typography.bodyLarge.fontSize
+                    )
+                }
+            }
+
+            KvizHeaderRow(
+                loadRandomEvent = {
+                    coroutineScope.launch {
+                        viewModel.loadRandomEvent(context)
+                    }
+                },
+                checkSettings = {
+                    coroutineScope.launch {
+                        val expectedEvent = repository.getEvent(viewModel.eventId.value)
+                        viewModel.checkSettings(expectedEvent, context)
+                    }
+                }
+            )
+
+            // Tady lokalizujeme assignment (kter˝ by mÏl b˝t String)
+            AllTextBlock(
+                assignment = viewModel.assignment.value.localized(langCode),
+                textColor = Color.Black,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                fontSize = 15
+            )
+
+            KvizDynamicComponents(
+                kvizScreenStates = visibilityStates.value,
+                isKvizScreen = true,
+                onSignalColorsChange = { colors ->
+                    viewModel.signalColors.value = colors
+                },
+                onSpeedLinesColorsChange = { colors ->
+                    viewModel.speedLinesColors.value = colors
+                },
+                onAllTabNumberTextChange = { viewModel.onAllTabNumberText.value = it },
+                onAllTabPictureTextChange = { viewModel.onAllTabPictureText.value = it },
+                resetTrigger = viewModel.resetTrigger.intValue
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            KvizControlButtons(
+                viewModel = viewModel,
+                kvizScreenStates = visibilityStates
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (viewModel.isAllDescriptionBoxVisible.value) {
+            ModalDialog(
+                onDismiss = { viewModel.isAllDescriptionBoxVisible.value = false },
+                content = {
+                    AllDescriptionBox(
+                        description = null,
+                        onClose = { viewModel.isAllDescriptionBoxVisible.value = false },
+                        showCloseButton = true,
+                        closeButtonText = localizedString(R.string.button_close),
+                        descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                        descriptionAlignment = TextAlign.Center,
+                        content = {
+                            Column(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = viewModel.resultCheck.value ?: "",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    modifier = Modifier.fillMaxWidth(0.8f)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                if (viewModel.resultCheck.value == localizedString(R.string.result_success)) {
+                                    Text(
+                                        text = viewModel.fineMessage.value ?: "",
+                                        style = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                } else {
+                                    Text(
+                                        text = viewModel.errorMessage.value ?: "",
+                                        style = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
+                    )
+                }
+            )
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.screens
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.localization.LanguagePreferenceManager
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.localization.wrapWithLocale
+
+object Destinations {
+    const val TRENAZER = "Trenaûer"
+    const val KVIZ = "KvÌz"
+    const val TEST = "Test"
+}
+
+@Composable
+fun MainScreen(
+    repository: NavestiRepository,
+    onExitApp: () -> Unit
+) {
+    // Navigation controller
+    val navController = rememberNavController()
+
+    // Current context and resolved language
+    val context = LocalContext.current
+    val langCode by produceState(initialValue = "cs") {
+        value = LanguagePreferenceManager.resolveAppLanguage(context)
+    }
+
+    // Context wrapped with selected locale
+    val localizedContext = context.wrapWithLocale(langCode)
+
+    CompositionLocalProvider(
+        LocalLocalizedContext provides localizedContext,
+        LocalContext provides localizedContext
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = Destinations.TRENAZER
+        ) {
+            composable(Destinations.TRENAZER) {
+                Trenazer(
+                    navController = navController,
+                    repository = repository,
+                    onExitApp = onExitApp
+                )
+            }
+            composable(Destinations.KVIZ) {
+                Kviz(
+                    navController = navController,
+                    onExitApp = onExitApp,
+                    repository = repository
+                )
+            }
+            composable(Destinations.TEST) {
+                Test(
+                    navController = navController,
+                    onExitApp = onExitApp,
+                    repository = repository
+                )
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.classes.GoogleAdBox
+import eu.dlnauka.navestidlo.ui.components.*
+import eu.dlnauka.navestidlo.ui.classes.TestViewModel
+import eu.dlnauka.navestidlo.ui.classes.TestViewModelFactory
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+@Composable
+fun Test(
+    navController: NavController,
+    repository: NavestiRepository,
+    onExitApp: () -> Unit
+) {
+    val viewModel: TestViewModel = viewModel(factory = TestViewModelFactory(repository))
+    val context = LocalLocalizedContext.current
+
+    var expanded by remember { mutableStateOf(false) }
+
+    // Stav pro zobrazov·nÌ mod·lnÌho okna (automaticky true p¯i startu)
+    var showDescription by rememberSaveable { mutableStateOf(true) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        BackgroundImage()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            // HornÌ menu
+            AllMenuBox(
+                screenName = localizedString(R.string.screen_test),
+                menuItems = listOf(
+                    MenuItem(Destinations.TRENAZER, R.string.trenazer_btn),
+                    MenuItem(Destinations.KVIZ, R.string.kviz_btn)
+                ),
+                onMenuOptionSelected = { navController.navigate(it) },
+                onExitApp = onExitApp,
+                expanded = expanded,
+                onExpandedChange = { expanded = it }
+            )
+
+            // PodmÌnÏnÈ UI ¯ÌzenÌ:
+            when {
+                // Je aktivnÌ v˝bÏr poËtu ot·zek
+                showDescription || viewModel.state.showQuestionSelect -> {
+                    ModalDialog(
+                        onDismiss = { showDescription = false },
+                        content = {
+                            AllDescriptionBox(
+                                description = localizedString(R.string.select_quest_count),
+                                onClose = { showDescription = false },
+                                showCloseButton = false,
+                                closeButtonText = localizedString(R.string.button_close),
+                                descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                                descriptionAlignment = TextAlign.Center,
+                                content = {
+                                    TestCountSelect(
+                                        onSelectionChanged = { count ->
+                                            showDescription = false
+                                            viewModel.setQuestionCount(count)
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    )
+                }
+
+                // Test je dokonËen õ zobraz v˝sledky
+                viewModel.state.showResults -> {
+                    TestResultsView(
+                        state = viewModel.state,
+                        onRestart = {
+                            viewModel.restartTest()
+                            expanded = false
+                            showDescription = true // Znovu vyvolat v˝bÏr ot·zek
+                        },
+                        onMenuExpand = { expanded = true }
+                    )
+                }
+
+                // ProbÌh· samotn˝ test õ UI + ot·zky
+                else -> {
+                    Column {
+                        AllTextBlock(
+                            assignment = localizedString(R.string.quiz_promt),
+                            textColor = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.4f))
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            fontSize = 18,
+                            backgroundColor = Color.Transparent
+                        )
+
+                        // ? BezpeËnÈ vykreslenÌ ot·zky
+                        if (viewModel.state.currentQuestion != null) {
+                            TestQuestionView(
+                                state = viewModel.state,
+                                onAnswerSelected = viewModel::selectAnswer,
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth()
+                            )
+
+                            TestProgressIndicators(
+                                questionCount = viewModel.state.questionCount,
+                                maxQuestionCount = viewModel.state.maxQuestionCount,
+                                correctAnswers = viewModel.state.correctAnswers
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(100.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentWidth(Alignment.CenterHorizontally)
+                        ) {
+                            GoogleAdBox.AdBanner(context = context)
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+package eu.dlnauka.navestidlo.ui.screens
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import eu.dlnauka.navestidlo.ui.classes.GoogleAdBox
+import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.datastore.Event
+import eu.dlnauka.navestidlo.ui.components.*
+import eu.dlnauka.navestidlo.ui.localization.LanguagePreferenceManager
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localized
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
+
+@Composable
+fun Trenazer(
+    navController: NavController,
+    repository: NavestiRepository,
+    onExitApp: () -> Unit
+) {
+    val context = LocalLocalizedContext.current
+    val langCode by produceState(initialValue = "cs") {
+        value = LanguagePreferenceManager.resolveAppLanguage(context)
+    }
+
+    val scrollState = rememberScrollState()
+
+    // V˝chozÌ ud·lost pro trenazer (s n·vÏstidlem nastaveno na "St˘j")
+    val defaultEvent = Event(
+        description = mapOf(
+            "cs" to "N·vÏst St˘j zakazuje strojvedoucÌmu jÌzdu vlaku. " +
+                "»elo jedoucÌho vlaku musÌ zastavit 10 m p¯ed hlavnÌm n·vÏstidlem. " +
+                "Tam, kde hlavnÌ n·vÏstidlo nenÌ p¯Ìmo u koleje, musÌ Ëelo vlaku zastavit p¯ed n·vÏstidlem s n·vÏstÌ Konec vlakovÈ cesty. " +
+                "Vzd·lenostÌ 10 m p¯ed hlavnÌm n·vÏstidlem je stanoveno obvyklÈ mÌsto zastavenÌ. " +
+                "StrojvedoucÌ m˘ûe zastavit co nejblÌûe p¯ed hlavnÌm n·vÏstidlem v p¯ÌpadÏ, ûe je to nutnÈ vzhledem k dÈlce vlaku nebo na pokyn v˝pravËÌho.",
+            "de" to "Signal Halt verbietet dem Triebfahrzeugf¸hrer die Weiterfahrt. " +
+                    "Die Spitze des Zuges muss 10 m vor dem Hauptsignal anhalten. " +
+                    "Wo kein Hauptsignal direkt am Gleis steht, muss die Zugspitze vor dem Signal mit dem Hinweis ÑEnde der Zugstraﬂeì anhalten. " +
+                    "Der Abstand von 10 m stellt die ¸bliche Halteposition dar. " +
+                    "Der Triebfahrzeugf¸hrer kann bei Bedarf oder auf Anweisung des Fahrdienstleiters n‰her heranfahren. "),
+        name = mapOf(
+            "cs" to "St˘j",
+            "de" to "Halt"),
+        isAllTab120Visible = false,
+        isAllHeadSignalVisible = true,
+        isShowLinesVisible = true,
+        signalColors = listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.Red),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+        ),
+        isAllSpeedLinesVisible = true,
+        speedLinesColors = listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray)
+        ),
+        isAllTabNumberVisible = false,
+        allTabNumberText = "",
+        isAllTabPictureVisible = false,
+        allTabPictureText = "",
+        isAllShiftBoxVisible = false,
+        shiftColors = listOf(
+            AllBlinkingColors.SolidColor(Color.DarkGray),
+            AllBlinkingColors.SolidColor(Color.DarkGray)
+        )
+    )
+    // Uchov·v·nÌ vybranÈ ud·losti a jejÌho ID
+    var selectedEvent by remember { mutableStateOf(defaultEvent) }
+    var selectedEventId by remember { mutableStateOf("") }
+
+    // Stav pro zobrazenÌ popisu vybranÈ ud·losti
+    var showDescription by remember { mutableStateOf(false) }
+
+    // Stav pro rozbalenÌ menu
+    var expanded by remember { mutableStateOf(false) }
+
+    // NaËÌt·nÌ novÈ ud·losti p¯i zmÏnÏ ID - v˝bÏru novÈ ud·losti
+    LaunchedEffect(selectedEventId) {
+        if (selectedEventId.isNotEmpty()) {
+
+            // NaËÌt·nÌ ud·losti podle ID
+            val newEvent = repository.getEvent(selectedEventId)
+            if (newEvent != null) {
+                selectedEvent = newEvent
+            }
+        }
+    }
+    // HlavnÌ Box pro celÈ zobrazenÌ obrazovky
+    Box(modifier = Modifier.fillMaxSize()) {
+        BackgroundImage()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
+            // HornÌ menu s moûnostmi pro p¯echod mezi obrazovkami
+            AllMenuBox(
+                screenName = localizedString(R.string.screen_trenazer),
+                menuItems = listOf(
+                    MenuItem(Destinations.KVIZ, R.string.kviz_btn),
+                    MenuItem(Destinations.TEST, R.string.test_btn)),
+                onMenuOptionSelected = { selectedScreen -> navController.navigate(selectedScreen) },
+                onExitApp = onExitApp,
+                expanded = expanded,
+                onExpandedChange = { expanded = it }
+            )
+            Spacer(modifier = Modifier.height(1.dp))
+
+            // ZobrazenÌ vybranÈ ud·losti na n·vÏstidle
+            key(selectedEvent) {
+                AllHeadSignal(
+                    isKvizScreen = false,
+                    isAllTab120Visible = selectedEvent.isAllTab120Visible,
+                    isAllHeadSignalVisible = selectedEvent.isAllHeadSignalVisible,
+                    isShowLinesVisible = selectedEvent.isShowLinesVisible,
+                    signalColors = selectedEvent.signalColors,
+                    isAllSpeedLinesVisible = selectedEvent.isAllSpeedLinesVisible,
+                    speedLinesColors = selectedEvent.speedLinesColors,
+                    isAllTabNumberVisible = selectedEvent.isAllTabNumberVisible,
+                    allTabNumberText = selectedEvent.allTabNumberText,
+                    isAllTabPictureVisible = selectedEvent.isAllTabPictureVisible,
+                    allTabPictureText = selectedEvent.allTabPictureText,
+                    isAllShiftBoxVisible = selectedEvent.isAllShiftBoxVisible,
+                    shiftColors = selectedEvent.shiftColors,
+                    onSignalColorsChange = {},
+                    onAllTabNumberTextChange = {},
+                    onAllTabPictureTextChange = {},
+                    onSpeedLinesColorsChange = {}
+                )
+            }
+            // Mezera s podmÌnkou pro p¯ÌpadnÈ zobrazenÌ posunovÈho boxu, kter˝ je menöÌ
+            Spacer(
+                modifier = Modifier.height(
+                    if (selectedEvent.isAllShiftBoxVisible) 245.dp else 10.dp
+                )
+            )
+            // V˝bÏr ud·losti pomocÌ rozevÌracÌho seznamu
+            TrenazerSpinner(
+                repository = repository,
+                onItemSelected = { selectedId ->
+                    selectedEventId = selectedId
+                }
+            )
+            Spacer(modifier = Modifier.height(50.dp))
+
+            // ReklamnÌ banner
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+            ) {
+                GoogleAdBox.AdBanner(context = context)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+        // ZobrazenÌ popisu ud·losti v mod·lnÌm oknÏ
+        if (showDescription) {
+            ModalDialog(
+                onDismiss = { showDescription = false },
+                content = {
+                    AllDescriptionBox(
+                        description = null,
+                        onClose = { showDescription = false },
+                        showCloseButton = true,
+                        closeButtonText = localizedString(R.string.button_close),
+                        descriptionTextStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                        descriptionAlignment = TextAlign.Center,
+                        content = {
+                            Column(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = selectedEvent.description.localized(langCode),
+                                    style = MaterialTheme.typography.bodyLarge.copy(color = Color.White)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
+                    )
+                }
+            )
+        } else {
+            // TlaËÌtko pro zobrazenÌ popisu
+            Button(
+                onClick = { showDescription = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                ),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .border(1.dp, Color.White, shape = MaterialTheme.shapes.medium)
+            ) {
+                Text(
+                    text = localizedString(R.string.button_desc),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize
+                )
+            }
+        }
+    }
+}
+
+
+-------
+
+package eu.dlnauka.navestidlo
+
+import android.app.Application
+import android.content.Context
+import eu.dlnauka.navestidlo.ui.localization.wrapWithLocale
+
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        val prefs = base.getSharedPreferences("settings", MODE_PRIVATE)
+        val lang = prefs.getString("language", "cs") ?: "cs"
+        super.attachBaseContext(base.wrapWithLocale(lang))
+    }
+}
+
+
+-------
+
+<resources>
+    <string name="app_name">N·vÏstidlo</string>
+    <string name="screen_trenazer"> T r e n a û e r </string>
+    <string name="screen_kviz"> K v Ì z </string>
+    <string name="screen_test"> T e s t </string>
+    <string name="close_btn"> KONEC </string>
+    <string name="kviz_btn"> KvÌz </string>
+    <string name="trenazer_btn"> Trenaûer </string>
+    <string name="test_btn"> Test </string>
+    <string name="indikator_120"> Indik·tor 120 </string>
+    <string name="indikatory"> Indik·tory </string>
+    <string name="tabulky"> Tabulky </string>
+    <string name="button_desc"> Popis </string>
+    <string name="button_reset"> Reset </string>
+    <string name="button_check"> Kontrola </string>
+    <string name="button_next"> DalöÌ </string>
+    <string name="button_close"> Zav¯Ìt </string>
+    <string name="select_quest_count"> Vyberte poËet ot·zek </string>
+    <string name="quiz_promt"> Co svÌtÌ na n·vÏstidle? </string>
+    <string name="button_confirm"> Potvrdit </string>
+    <string name="button_retry"> Znovu </string>
+    <string name="button_menu"> Menu </string>
+    <string name="test_count_label"> PoËet ot·zek: %1$d z %2$d </string>
+    <string name="test_success_rate"> Procentu·lnÌ ˙spÏönost: %1$d%% </string>
+    <string name="dropdown_label"> Vyberte poloûku </string>
+    <string name="quiz_title"> Nastav na n·vÏstidle: </string>
+    <string name="test_result">HodnocenÌ testu: %1$d%%</string>
+
+    <string name="event_not_found"> Ud·lost nebyla nalezena </string>
+    <string name="event_load_error"> Chyba p¯i naËÌt·nÌ </string>
+    <string name="result_success">? USPÃL ?</string>
+    <string name="result_failure">? NEUSPÃL ?</string>
+
+    <!-- ChybovÈ hl·öky -->
+    <string name="error_head_signal"> Barvy n·vÏstidla jsou chybnÏ. </string>
+    <string name="error_speed_lines"> RychlostnÌ pruhy jsou chybnÏ. </string>
+    <string name="error_number_indicator"> Rychlost na indik·toru je chybnÏ. </string>
+    <string name="error_picture_tab"> DoplÚkov· tabulka je chybnÏ. </string>
+    <string name="error_shift_box"> Barvy n·vÏstidla pro posun se neshodujÌ. </string>
+    <string name="error_indicator_120"> Indik·tor 120 km/h je chybnÏ. </string>
+
+    <!-- MotivaËnÌ hl·öky -->
+    <string-array name="success_messages">
+        <item> Jen tak d·le :-D. </item>
+        <item> V˝bornÏ, z Tebe uû je hotovej fÌra! </item>
+        <item> Ty uû jezdÌö hodnÏ dlouho, co? </item>
+        <item> UdÏlej i nÏjakou chybu! P¯est·v· to b˝t sranda. </item>
+        <item> Ty m·ö pamÏù jako slon. :-D </item>
+    </string-array>
+
+    <!-- MotivaËnÌ hl·öky -->
+    <string-array name="failed_messages">
+        <item> NevadÌ, p¯ÌötÏ to zvl·dneö! </item>
+        <item> Hlavu vzh˘ru, zkus to znovu! </item>
+        <item> CviËenÌ dÏl· mistra! </item>
+        <item> Nep¯est·vej se uËit a zlepöÌö se. </item>
+        <item> Kaûd˝ ne˙spÏch je krokem k ˙spÏchu! </item>
+    </string-array>
+</resources>
+
+<resources>
+    <string name="app_name">Signalbilder</string>
+    <string name="screen_trenazer"> T r a i n e r </string>
+    <string name="screen_kviz"> Q u i z </string>
+    <string name="screen_test"> T e s t </string>
+    <string name="close_btn"> ENDE </string>
+    <string name="kviz_btn"> Quiz </string>
+    <string name="trenazer_btn"> Trainer </string>
+    <string name="test_btn"> Test </string>
+    <string name="indikator_120"> Indikator 120 </string>
+    <string name="indikatory"> Indikatoren </string>
+    <string name="tabulky"> Tabellen </string>
+    <string name="button_desc"> Beschreibung </string>
+    <string name="button_reset"> Zur¸cksetzen </string>
+    <string name="button_check"> Pr¸fen </string>
+    <string name="button_next"> N‰chste </string>
+    <string name="button_close"> Schlieﬂen </string>
+    <string name="select_quest_count"> Anzahl der Fragen ausw‰hlen </string>
+    <string name="quiz_promt"> Was zeigt das Signal an? </string>
+    <string name="button_confirm"> Best‰tigen </string>
+    <string name="button_retry"> Erneut </string>
+    <string name="button_menu"> Men¸ </string>
+    <string name="test_count_label"> Fragen: %1$d von %2$d </string>
+    <string name="test_success_rate"> Erfolgsquote: %1$d%% </string>
+    <string name="dropdown_label"> Auswahl treffen </string>
+    <string name="quiz_title"> Stelle das Signalbild ein: </string>
+    <string name="test_result"> Testergebnis: %1$d%% </string>
+
+    <string name="event_not_found"> Ereignis nicht gefunden </string>
+    <string name="event_load_error"> Fehler beim Laden </string>
+    <string name="result_success"> ? BESTANDEN ? </string>
+    <string name="result_failure"> ?FEHLGESCHLAGEN? </string>
+
+    <!-- Fehlermeldungen -->
+    <string name="error_head_signal"> Die Signallichter sind falsch eingestellt. </string>
+    <string name="error_speed_lines"> Die Geschwindigkeitsstreifen sind falsch. </string>
+    <string name="error_number_indicator"> Die angezeigte Geschwindigkeit ist falsch. </string>
+    <string name="error_picture_tab"> Die Zusatztafel ist falsch. </string>
+    <string name="error_shift_box"> Die Rangiersignale stimmen nicht ¸berein. </string>
+    <string name="error_indicator_120"> Der 120 km/h-Indikator ist falsch. </string>
+
+    <!-- Motivationsspr¸che bei Erfolg -->
+    <string-array name="success_messages">
+        <item> Weiter so! :-D </item>
+        <item> Ausgezeichnet, Sie sind schon jetzt ein kompletter Schurke! </item>
+        <item> F‰hrst du heimlich schon lange Zug? </item>
+        <item> Mach mal einen Fehler ñ sonst wirdís langweilig. </item>
+        <item> Du hast ein Elefantenged‰chtnis. :-D </item>
+    </string-array>
+
+    <!-- Motivationsspr¸che bei Misserfolg -->
+    <string-array name="failed_messages">
+        <item> Kein Problem, beim n‰chsten Mal schaffst duís! </item>
+        <item> Kopf hoch ñ versuchís nochmal! </item>
+        <item> ‹bung macht den Meister! </item>
+        <item> Bleib dran ñ du wirst besser! </item>
+        <item> Jeder Fehler bringt dich voran! </item>
+    </string-array>
+</resources>

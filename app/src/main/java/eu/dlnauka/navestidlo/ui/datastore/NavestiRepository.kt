@@ -1,7 +1,9 @@
 package eu.dlnauka.navestidlo.ui.datastore
 
+import android.util.Log
 import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.perf.FirebasePerformance
+import eu.dlnauka.navestidlo.ui.utils.localized
+// import com.google.firebase.perf.FirebasePerformance
 
 // Repository vrstva, která zajišťuje přístup k datům.
 class NavestiRepository(
@@ -16,6 +18,7 @@ class NavestiRepository(
             // Použití mezivrstvy pro získání dat
             dataSource.getNavestiList()
         } catch (e: Exception) {
+            Log.e("NvestiRepository", "getNavestiList() failed", e)
             emptyList()
         }
     }
@@ -32,6 +35,7 @@ class NavestiRepository(
             event
         } catch (e: Exception) {
             // trace.stop()
+            Log.e("NvestiRepository", "getEvent() failed", e)
             null
         }
     }
@@ -51,20 +55,25 @@ class NavestiRepository(
             val randomDoc = documents.randomOrNull() ?: return null
             val event = getEvent(randomDoc.first) ?: return null
 
-            // Načte všechny data z názvů dokumentů
-            val allNames = documents.map { it.second }
+            // Získá lokalizovaný název události
+            val correctName = event.name.localized()
 
-            // Vybere také náhodné nesprávné odpovědi
-            val randomWrongAnswers = allNames.shuffled().take(2)
+            // Vybere náhodné nesprávné odpovědi kromě správné
+            val randomWrongAnswers = documents
+                .map { it.second }
+                .filterNot { it == correctName }
+                .shuffled()
+                .take(2)
 
-            // Vytvoří seznam správných a špatných odpovědí a zamíchá je
-            val answerOptions = (randomWrongAnswers + event.name).shuffled()
+            // Vytvoří seznam odpovědí a zamíchá
+            val answerOptions = (randomWrongAnswers + correctName).shuffled()
 
-            // Aktualizuje událost s správnou odpovědí
-            val updatedEvent = event.copy(correctAnswer = event.name)
+            // Aktualizuje event se správnou odpovědí
+            val updatedEvent = event.copy(correctAnswer = correctName)
 
             Pair(updatedEvent, answerOptions)
         } catch (e: Exception) {
+            Log.e("NvestiRepository", "getRandomQuestion() failed", e)
             null
         }
     }

@@ -4,8 +4,8 @@ import eu.dlnauka.navestidlo.ui.components.AllBlinkingColors
 
 // Definuje datovou třídu Event pro reprezentaci události
 data class Event(
-    val description: String = "",
-    val name: String = "",
+    val description: Map<String, String> = emptyMap(),
+    val name: Map<String, String> = emptyMap(),
     val isAllTab120Visible: Boolean = false,
     val isAllHeadSignalVisible: Boolean = false,
     val isShowLinesVisible: Boolean = false,

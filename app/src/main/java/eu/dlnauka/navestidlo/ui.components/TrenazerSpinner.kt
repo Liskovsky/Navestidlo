@@ -1,5 +1,6 @@
 package eu.dlnauka.navestidlo.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,7 +13,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import eu.dlnauka.navestidlo.R
 import eu.dlnauka.navestidlo.ui.datastore.NavestiRepository
+import eu.dlnauka.navestidlo.ui.localization.LocalLocalizedContext
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 import kotlinx.coroutines.launch
 
 @Composable
@@ -30,8 +34,8 @@ fun TrenazerSpinner(
     // Stav pro ovládání zobrazení dropdown menu
     var expanded by remember { mutableStateOf(false) }
 
-    // Počáteční text
-    var selectedItem by remember { mutableStateOf("Vyberte položku") }
+    // Stav vybrané položky - uchovává jen klíč, nikoliv přeložený text
+    var selectedKey by remember { mutableStateOf<String?>(null) }
 
     // Seznam položek
     var items by remember { mutableStateOf(listOf<Pair<String, String>>()) }
@@ -40,29 +44,36 @@ fun TrenazerSpinner(
     val coroutineScope = rememberCoroutineScope()
 
     // LaunchedEffect pro načítání položek při zobrazení composable
+    val context = LocalLocalizedContext.current
+
     LaunchedEffect(Unit) {
         coroutineScope.launch {
             items = try {
-
-                // Načítání položek z repozitáře
                 repository.getNavestiList()
                     .map { Pair(it.first, it.second.replace("km/h", "km\u00A0/\u00A0h")) }
             } catch (e: Exception) {
+                Log.e("TrenazerSpinner", "Chyba načítání", e)
 
                 // Chyba při načítání dat
-                listOf(Pair("0", "Chyba načítání"))
+                listOf(Pair("0", context.getString(R.string.event_load_error)))
             }
         }
     }
+
     // Box pro obalování UI komponenty
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
     ) {
+        // Dynamicky vybraný text – buď hodnota ze seznamu, nebo výchozí text
+        val displayedText = selectedKey?.let { key ->
+            items.find { it.first == key }?.second
+        } ?: localizedString(R.string.dropdown_label)
+
         // Text zobrazený v rozbaleném spinneru
         Text(
-            text = selectedItem,
+            text = displayedText,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -79,6 +90,7 @@ fun TrenazerSpinner(
                 )
                 .padding(horizontal = 10.dp, vertical = 10.dp)
         )
+
         // Dropdown menu pro výběr položky
         DropdownMenu(
             expanded = expanded,
@@ -94,7 +106,7 @@ fun TrenazerSpinner(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            selectedItem = item.second
+                            selectedKey = item.first
                             expanded = false
                             onItemSelected(item.first)
                         }

@@ -9,6 +9,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.graphics.Color
 import eu.dlnauka.navestidlo.ui.classes.KvizViewModel
 import eu.dlnauka.navestidlo.ui.classes.KvizScreenState
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 
 // Definice kompozice pro zobrazení ovládacích tlačítek kvízu
 @Composable
@@ -28,7 +30,7 @@ fun KvizControlButtons(
     ) {
         // Tlačítko pro přepnutí viditelnosti "Indikátor 120"
         AllCustomButton(
-            text = "Indikátor 120",
+            text = localizedString(R.string.indikator_120),
             onClick = {
                 val newValue = !kvizScreenStates.value.isAllTab120Visible
                 kvizScreenStates.value = kvizScreenStates.value.copy(isAllTab120Visible = newValue)
@@ -40,7 +42,7 @@ fun KvizControlButtons(
         )
         // Tlačítko pro přepínání mezi indikátory
         AllCustomButton(
-            text = "Indikátory",
+            text = localizedString(R.string.indikatory),
             onClick = {
                 var newState = kvizScreenStates.value
                 if (newState.isAllTabPictureVisible) {
@@ -58,7 +60,7 @@ fun KvizControlButtons(
         )
         // Tlačítko pro přepínání tabulek
         AllCustomButton(
-            text = "Tabulky",
+            text = localizedString(R.string.tabulky),
             onClick = {
                 var newState = kvizScreenStates.value
                 if (newState.isAllTabNumberVisible) {

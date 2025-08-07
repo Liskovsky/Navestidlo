@@ -1,8 +1,10 @@
 package eu.dlnauka.navestidlo.ui.datastore
 
+import android.util.Log
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import eu.dlnauka.navestidlo.ui.classes.ColorParser
+import eu.dlnauka.navestidlo.ui.utils.localized
 import kotlinx.coroutines.tasks.await
 
 // Implementace třídy, která komunikuje s Firestore
@@ -13,13 +15,14 @@ class FirestoreDataSource(
     // Získání seznamu návěstí (id + název)
     override suspend fun getNavestiList(): List<Pair<String, String>> {
         return try {
-            val documents = firestore.collection("Návěsti").get().await()
+            val documents = firestore.collection("Navestidla").get().await()
             documents.map {
-                val name = it.getString("Name") ?: "Neznámá návěst"
-                val id = it.id
-                Pair(id, name)
+                val nameMap = it.get("Name") as? Map<String, String> ?: emptyMap()
+                val name = nameMap.localized()
+                Pair(it.id, name)
             }
         } catch (e: Exception) {
+            Log.e("FirestoreDataSource", "Chyba při čtení dat", e)
             emptyList()
         }
     }
@@ -27,9 +30,10 @@ class FirestoreDataSource(
     // Získání náhodného dokumentu z kolekce "Návěsti"
     override suspend fun getRandomEventDocument(): DocumentSnapshot? {
         return try {
-            val documents = firestore.collection("Návěsti").get().await()
+            val documents = firestore.collection("Navestidla").get().await()
             documents.documents.randomOrNull()
         } catch (e: Exception) {
+            Log.e("FirestoreDataSource", "Chyba při čtení dat", e)
             null
         }
     }
@@ -37,12 +41,12 @@ class FirestoreDataSource(
     // Získání konkrétní události podle její ID
     override suspend fun getEvent(eventId: String): Event? {
         return try {
-            val document = firestore.collection("Návěsti").document(eventId).get().await()
+            val document = firestore.collection("Navestidla").document(eventId).get().await()
             if (document.exists()) {
                 val data = document.data ?: return null
                 Event(
-                    description = data["Description"] as? String ?: "",
-                    name = data["Name"] as? String ?: "",
+                    name = data["Name"] as? Map<String, String> ?: emptyMap(),
+                    description = data["Description"] as? Map<String, String> ?: emptyMap(),
                     isAllTab120Visible = data["tab120Visible"] as? Boolean ?: false,
                     isAllHeadSignalVisible = data["hlavniNavestidloVisible"] as? Boolean ?: false,
                     isShowLinesVisible = data["showLines"] as? Boolean ?: false,
@@ -58,6 +62,7 @@ class FirestoreDataSource(
                 )
             } else null
         } catch (e: Exception) {
+            Log.e("FirestoreDataSource", "Chyba při čtení dat", e)
             null
         }
     }

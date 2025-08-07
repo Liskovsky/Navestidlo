@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 
 @Composable
 fun TestCountSelect(onSelectionChanged: (Int) -> Unit) {
@@ -49,7 +51,7 @@ fun TestCountSelect(onSelectionChanged: (Int) -> Unit) {
             horizontalArrangement = Arrangement.Center
         ) {
             AllDescriptionButton(
-                text = "Potvrdit",
+                text = localizedString(R.string.button_confirm),
                 onClick = { onSelectionChanged(selectedOption) }
             )
         }

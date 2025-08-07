@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.dlnauka.navestidlo.R
+import eu.dlnauka.navestidlo.ui.utils.localizedString
 
 @Composable
 fun TestProgressIndicators(
@@ -29,7 +31,11 @@ fun TestProgressIndicators(
             // Zobrazuje text pro počet otázek
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Počet otázek: $questionCount z $maxQuestionCount",
+                text = localizedString(
+                    R.string.test_count_label,
+                    questionCount,
+                    maxQuestionCount
+                ),
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -51,7 +57,10 @@ fun TestProgressIndicators(
 
             // Text pro zobrazení procentuální úspěšnosti
             Text(
-                text = "Procentuální úspěšnost: ${successRate.toInt()}%",
+                text = localizedString(
+                    R.string.test_success_rate,
+                    successRate.toInt()
+                ),
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
