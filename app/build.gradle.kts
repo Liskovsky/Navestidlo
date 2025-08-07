@@ -15,7 +15,7 @@ android {
         applicationId = "eu.dlnauka.navestidlo"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
